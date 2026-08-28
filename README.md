@@ -82,7 +82,18 @@ Inspect it in human-readable form — this is the Phase 0 gate:
 .venv/bin/python scripts/inspect_data.py
 ```
 
-### Real timetable data
+### Reproducing the numbers without an API key
+
+The RailRadar responses and the derived section file are **committed**
+(`data/cache/railradar/`, `data/grounded_sections.json`). They are public
+timetable data, and tracking them means every figure here can be reproduced
+offline by anyone, with no key and no network. `--offline` forces cache-only:
+
+```bash
+.venv/bin/python scripts/fetch_timetable.py --from-train 64422,64076,64464,64908 --offline
+```
+
+### Fetching fresh timetable data
 
 Get a free sandbox key (1,000 requests/month) at
 <https://railradar.in/developers>, then put it in a `.env` file in the repo
