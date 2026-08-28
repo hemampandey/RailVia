@@ -247,6 +247,46 @@ The optimiser does not use this averaged figure at all — it costs blocks
 against the measured per-day grid (`profile_by_dow`), so a Sunday block is
 priced with Sunday's traffic.
 
+## A-14 — Peak-hour rule is relative, not absolute
+
+**Status:** `CONSTRUCT`, forced by real data
+
+The brief specifies "no blocks where `trains_per_hour > 8`". Real traffic
+does not survive that rule. On Sahibabad–Ghaziabad, 364 trains a day and a
+floor of 2.9 trains/hour mean only **2 hours of the day** sit under 8/h, with
+no contiguous window longer than 2 hours. Every task in our catalogue longer
+than 120 minutes would have been infeasible there, including a 240-minute
+points-and-crossings overhaul the generator had already placed on it.
+
+We therefore forbid blocks outside **each section's own quietest 25% of
+hours**. Every section then has 4–7 hours of contiguous permitted window,
+and the rule needs no recalibration when a new corridor is ingested.
+
+Stated for a judge: *the busiest three-quarters of a section's day is closed
+to planned work, measured against that section's own traffic.* The threshold
+is a parameter (`--percentile`), not a constant buried in the model.
+
+## A-15 — Co-location is only rewarded where blocking costs something
+
+**Status:** known limitation of the Phase 1 objective
+
+Cost is charged per block, so two departments sharing one block pay once.
+That is what makes the optimiser discover co-location without a hardcoded
+bonus. But the saving is proportional to traffic during the block, and
+several sections on the NDLS–GZB corridor carry **no trains at all** around
+01:00. Where blocking is free, merging saves nothing and the optimiser is
+correctly indifferent.
+
+Real planners would still merge: a block carries handover, protection and
+staff-mobilisation costs that have nothing to do with lost train-hours. Our
+objective does not model those, so **our co-location count understates what
+coordination is worth**. Adding a small fixed cost per block would fix it and
+would not be a co-location bonus in disguise — it is a real cost we currently
+ignore. Deferred so that Phase 1 reports only what the brief specifies.
+
+Pinned by `tests/test_optimiser_constraints.py::
+test_no_colocation_incentive_when_blocking_is_free`.
+
 ---
 
 ## Known weaknesses to state out loud
@@ -257,7 +297,9 @@ priced with Sunday's traffic.
 3. **Traffic data is passenger-only.** Freight does not appear in public
    timetables, so night-time traffic on real sections is undercounted — the
    one place our figures could flatter us. See A-04.
-4. **Uniform activity sampling under-represents TRD.** Phase 0 draws
+4. **Co-location is undercounted** where night traffic is genuinely zero.
+   See A-15.
+5. **Uniform activity sampling under-represents TRD.** Phase 0 draws
    activities uniformly from a catalogue holding 5 ENGG, 4 S&T and 3 TRD
    entries, so TRD receives roughly a quarter of the tasks. For a project
    about three-department coordination this understates one department.

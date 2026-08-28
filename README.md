@@ -22,8 +22,8 @@ See [PROJECT_BRIEF.md](PROJECT_BRIEF.md) for full scope and build order.
 |-------|-------|-------|
 | 0 | Data model + tiny generator (5 sections, 20 tasks, 7 days) | done |
 | 0.5 | Real timetable ingestion — pipeline built, awaiting API key | ready to run |
-| 1 | Minimum viable CP-SAT optimiser | next |
-| 2 | IRPWM-grounded data at scale, full constraints | |
+| 1 | Minimum viable CP-SAT optimiser | done |
+| 2 | IRPWM-grounded data at scale, crew + deadline constraints | next |
 | 3 | Criticality model + baseline simulator | |
 | 4 | FastAPI + React Gantt UI | |
 | 5 | Polish, re-planning, recorded demo | |
@@ -81,6 +81,16 @@ resumable. Then:
 .venv/bin/python scripts/inspect_data.py --grounded
 ```
 
+### Solve
+
+```bash
+.venv/bin/python scripts/optimise.py --grounded
+```
+
+Prints the permitted windows per section, the block plan as a text table, and
+the train-hours lost. `--percentile` controls how much of each section's day
+is open to planned work (default: quietest 25%).
+
 Run the tests:
 
 ```bash
@@ -96,7 +106,8 @@ src/generator/    Synthetic instance generator (a deliverable, not a shortcut)
 src/adapters/     THE BOUNDARY: DataSource interface, synthetic source,
                   hybrid (real traffic + synthetic tasks), and typed stubs
                   for the four real systems
-src/optimiser/    CP-SAT model                    (Phase 1)
+src/optimiser/    CP-SAT model: windows.py (time grid, permitted
+                  windows), model.py (the solver model)
 src/ml/           Criticality scoring             (Phase 3)
 src/baseline/     Manual-process simulator        (Phase 3)
 src/api/          FastAPI                         (Phase 4)
