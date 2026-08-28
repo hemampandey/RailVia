@@ -33,6 +33,7 @@ from src.models import (
     PlanningInstance,
     Section,
     SourceKind,
+    TrafficWindow,
 )
 
 DEFAULT_GROUNDED_PATH = pathlib.Path("data/grounded_sections.json")
@@ -72,6 +73,7 @@ class GroundedTimetableSource(DataSource):
         self.horizon_days = horizon_days
         self.horizon_start = horizon_start
         self.division = division
+        self._weekly: dict[str, list[list[float]]] = {}
 
     @property
     def provenance(self) -> str:  # type: ignore[override]
@@ -94,6 +96,7 @@ class GroundedTimetableSource(DataSource):
                 f"--from-train <number> --start <code> --end <code>"
             )
         payload = json.loads(self.path.read_text())
+        self._weekly: dict[str, list[list[float]]] = {}
         sections: list[Section] = []
         for record in payload["sections"]:
             profile = [float(x) for x in record["traffic_density_profile"]]
@@ -102,11 +105,15 @@ class GroundedTimetableSource(DataSource):
                 # probably not adjacent. Dropping it is right — a section that
                 # looks empty would be scheduled through rush hour for free.
                 continue
+            grid = record.get("profile_by_dow")
+            if isinstance(grid, list) and len(grid) == 7:
+                self._weekly[record["id"]] = [[float(x) for x in row] for row in grid]
             length = record.get("length_km")
             sections.append(
                 Section(
                     id=record["id"],
-                    name=f"{record['station_a']} - {record['station_b']}",
+                    name=record.get("name")
+                    or f"{record['station_a']} - {record['station_b']}",
                     division=self.division,
                     # Fall back only when the timetable carried no distance.
                     length_km=float(length) if length else 1.0,
@@ -119,14 +126,42 @@ class GroundedTimetableSource(DataSource):
             )
         return sections
 
+    def build_traffic_windows(self, sections: list[Section]) -> list[TrafficWindow]:
+        """Expand the real 7x24 grid into per-day traffic windows.
+
+        Where a weekly grid is available we use the measured day-of-week
+        traffic directly, instead of scaling one weekday shape by invented
+        multipliers. Sections lacking a grid fall back to the flat profile.
+
+        No goods windows are flagged: freight paths do not appear in public
+        timetables, and inventing them would be fabricating traffic.
+        """
+        from datetime import timedelta
+
+        windows: list[TrafficWindow] = []
+        for section in sections:
+            grid = self._weekly.get(section.id)
+            for offset in range(self.horizon_days):
+                day = self.horizon_start + timedelta(days=offset)
+                dow = day.weekday()
+                profile = grid[dow] if grid else section.traffic_density_profile
+                for hour in range(24):
+                    windows.append(
+                        TrafficWindow(
+                            section_id=section.id,
+                            day=day,
+                            hour_of_day=hour,
+                            day_of_week=dow,
+                            trains_per_hour=round(float(profile[hour]), 2),
+                            is_goods_forecast=False,
+                        )
+                    )
+        return windows
+
     def load(self) -> PlanningInstance:
         # The adapter layer is the one place permitted to know the generator
         # exists; downstream packages must go through DataSource.
-        from src.generator.synthetic import (
-            build_crew_capacity,
-            build_traffic,
-            generate_tasks,
-        )
+        from src.generator.synthetic import build_crew_capacity, generate_tasks
 
         sections = self.load_sections()
         rng = random.Random(self.seed)
@@ -147,8 +182,10 @@ class GroundedTimetableSource(DataSource):
                 traffic=SourceKind.PUBLIC_TIMETABLE,
                 crew_capacity=SourceKind.SYNTHETIC,
                 notes=(
-                    "Traffic and section geometry from the published timetable; "
-                    "maintenance backlog and crew strength generated."
+                    "Section geometry, hourly traffic and day-of-week variation "
+                    "from the published timetable (train runDays); maintenance "
+                    "backlog and crew strength generated. No freight: goods "
+                    "paths are absent from public timetables."
                 ),
             ),
             provenance=PROVENANCE,
@@ -156,7 +193,7 @@ class GroundedTimetableSource(DataSource):
             horizon_days=self.horizon_days,
             sections=sections,
             tasks=tasks,
-            traffic=build_traffic(sections, self.horizon_start, self.horizon_days),
+            traffic=self.build_traffic_windows(sections),
             crew_capacity=build_crew_capacity(
                 rng, self.horizon_start, self.horizon_days
             ),

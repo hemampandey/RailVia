@@ -47,9 +47,9 @@ checks one invented reference discounts everything else we claim.
 
 ## A-02 — Traffic density profiles
 
-**Status:** `PROVISIONAL` for the synthetic instance; `GROUNDED` for the
-hybrid instance **once the fetch has been run** (pipeline built, not yet
-executed — no API key held at time of writing).
+**Status:** `PROVISIONAL` for the synthetic instance; **`GROUNDED` for the
+hybrid instance** — fetched 2026-08-28 for the New Delhi–Ghaziabad corridor
+(8 sections, 11 API requests).
 
 The 24-hour `traffic_density_profile` on each section is one of three
 hand-built archetypes (`suburban_trunk`, `mixed_trunk`, `branch_line`) in
@@ -79,8 +79,14 @@ Two details matter for correctness:
   because consecutive stops on a route are adjacent by construction. Two
   stations that merely both exist on a line are not a section.
 
-Until that fetch is actually run, the numbers in use remain the hand-built
-archetypes below, and the status above stays `PROVISIONAL`.
+**Verified against live data (2026-08-28).** At Ghaziabad,
+`includeIntermediate=true` returns 492 trains against 307 without it: 185
+pass-through trains, **38% of that station's traffic**. Omitting them would
+have understated the cost of blocking by more than a third and inflated our
+headline improvement accordingly.
+
+The synthetic instance still uses the hand-built archetypes below, and its
+status stays `PROVISIONAL`.
 
 ## A-03 — Block durations and 15-minute granularity
 
@@ -96,7 +102,8 @@ CP-SAT time grid small enough to solve inside the 60-second demo budget.
 
 ## A-04 — Day-of-week and freight variation
 
-**Status:** `CONSTRUCT` — and it stays that way even with real timetable data.
+**Status:** day-of-week is now **`GROUNDED`**; freight remains `CONSTRUCT`
+and absent.
 
 Weekday traffic is multiplied by day-of-week factors (Fri 1.05, Sat 0.90,
 Sun 0.75, otherwise 1.00) to reflect lighter weekend passenger services.
@@ -105,11 +112,18 @@ Freight is flagged on night hours (22:00–04:00) of mixed-traffic sections.
 Both are qualitative patterns, not measured factors. They exist so the
 optimiser faces a non-uniform week rather than seven identical days.
 
-Neither is fixed by the timetable feed:
+Day-of-week is now measured, freight is not:
 
-* **Day-of-week** would need each train's `runDays`, which the bulk train
-  lookup does not carry. Getting it means one request per train, which the
-  1,000-request monthly allowance does not comfortably support. Deferred.
+* **Day-of-week is real.** The station board carries each train's `runDays`,
+  at no extra request cost — the bulk lookup lacks it, but the per-station
+  board has it. We therefore build a measured 7x24 traffic grid per section
+  rather than scaling one weekday shape by invented multipliers.
+
+  The real data corrects us: on Sahibabad–Ghaziabad, daily totals run
+  350 (Sat) to 373 (Thu) — a spread of about 6%. Our hand-chosen Sunday
+  multiplier of 0.75 was wrong by roughly 20 percentage points. A trunk
+  section carrying long-distance traffic simply does not empty at weekends
+  the way a commuter-only line would.
 * **Freight is genuinely absent from public data.** Goods paths are allotted
   dynamically and do not appear in published passenger timetables. For
   timetable-derived sections we therefore flag **no** goods windows at all
@@ -171,8 +185,8 @@ one ranking, and that the ranking is explainable. We claim nothing more.
 
 ## A-09 — Section identity and length
 
-**Status:** partly `GROUNDED`, partly `PROVISIONAL`; fully `GROUNDED` in the
-hybrid instance once fetched.
+**Status:** `PROVISIONAL` in the synthetic instance; **`GROUNDED`** in the
+hybrid instance.
 
 Section names are real inter-station stretches of the Delhi division,
 Northern Railway (New Delhi, Shahdara, Sahibabad, Ghaziabad, Okhla,
@@ -183,6 +197,11 @@ In the hybrid instance both problems disappear: sections come from a real
 train's route, and `length_km` is the difference between the two stations'
 `distance` values in the timetable (median over all trains calling at both,
 since individual records can be wrong).
+
+The fetched corridor is train 64422's route, New Delhi to Ghaziabad:
+NDLS – Shivaji Bridge – Tilak Bridge – Mandawali Chander Vihar – Anand Vihar
+– Chander Nagar – Delhi Shahdara B Panel – Sahibabad – Ghaziabad. Eight
+sections, 1–7 km each.
 
 ## A-10 — Co-location eligibility
 
@@ -214,6 +233,19 @@ Real multi-line sections permit work on one line while traffic runs on
 another, at reduced capacity. Modelling this needs per-line traffic data we
 do not have; the single-line assumption is **conservative** — it overstates
 the cost of blocking, so our improvement figures are not flattered by it.
+
+## A-13 — The traffic figure is a weekly mean
+
+**Status:** `CONSTRUCT` (a reporting choice, not a data gap)
+
+`Section.traffic_density_profile` is the **average across the seven days**,
+not the union of all trains that ever traverse. The distinction is large:
+482 distinct trains cross Sahibabad–Ghaziabad during a week, but only about
+364 on any given day. Reporting the union would overstate every day.
+
+The optimiser does not use this averaged figure at all — it costs blocks
+against the measured per-day grid (`profile_by_dow`), so a Sunday block is
+priced with Sunday's traffic.
 
 ---
 

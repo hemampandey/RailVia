@@ -72,9 +72,15 @@ def main() -> int:
         print("  " + " -> ".join(codes))
 
         boards = {}
+        names: dict[str, str] = {}
         for code in codes:
-            boards[code] = client.station_board(code, include_intermediate=True)
-            print(f"  fetched board: {code}")
+            payload = client.station_board(code, include_intermediate=True)
+            boards[code] = payload
+            body = payload.get("data") if isinstance(payload, dict) else None
+            station = body.get("station") if isinstance(body, dict) else None
+            if isinstance(station, dict) and station.get("name"):
+                names[code] = str(station["name"])
+            print(f"  fetched board: {code} ({names.get(code, code)})")
     except RailRadarError as exc:
         print(f"\nFAILED: {exc}", file=sys.stderr)
         if "API key" in str(exc):
@@ -93,7 +99,7 @@ def main() -> int:
     print("-" * 92)
     for s in sections:
         print(
-            f"{s.section_id:14} {s.daily_trains:>10} {s.peak_trains_per_hour:>7.0f} "
+            f"{s.section_id:14} {s.daily_trains:>10.0f} {s.peak_trains_per_hour:>7.1f} "
             f"{s.quietest_hour:>5}h {str(s.length_km if s.length_km is not None else '?'):>7}  "
             f"|{sparkline(s.profile)}|"
         )
@@ -119,9 +125,18 @@ def main() -> int:
                     "id": s.section_id,
                     "station_a": s.station_a,
                     "station_b": s.station_b,
+                    "name": (
+                        f"{names.get(s.station_a, s.station_a)} - "
+                        f"{names.get(s.station_b, s.station_b)}"
+                    ),
                     "length_km": s.length_km,
                     "traffic_density_profile": s.profile,
+                    # Real 7x24 grid from each train's runDays: weekday and
+                    # weekend traffic measured separately, not scaled.
+                    "profile_by_dow": s.profile_by_dow,
                     "daily_trains": s.daily_trains,
+                    "distinct_trains": s.distinct_trains,
+                    "train_types": sorted({t.train_type for t in s.traversals if t.train_type}),
                 }
                 for s in sections
             ],

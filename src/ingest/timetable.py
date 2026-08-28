@@ -36,11 +36,37 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 HOURS = 24
+DAYS = 7
 _TIME_RE = re.compile(r"^(\d{1,2}):(\d{2})")
+
+# RailRadar reports weekdays as three-letter lowercase names. 0 = Monday, to
+# match datetime.date.weekday().
+DOW_NAMES: tuple[str, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+DOW_INDEX: dict[str, int] = {name: i for i, name in enumerate(DOW_NAMES)}
+ALL_DAYS: frozenset[int] = frozenset(range(DAYS))
+
+# stopType values seen in live responses. Everything except "pass-through"
+# means the train is scheduled to stand at the station; all of them mean it
+# is present on the section either side.
+HALT_STOP_TYPES: frozenset[str] = frozenset({"halt", "origin", "destination"})
+
+
+def parse_run_days(value: Any) -> frozenset[int]:
+    """['mon','tue',...] -> {0,1,...}. Unknown or absent means runs daily.
+
+    Defaulting to daily is the conservative choice: it never removes traffic
+    that might be there, so a parsing gap cannot make a section look quieter
+    than it is.
+    """
+    if not isinstance(value, (list, tuple, set, frozenset)):
+        return ALL_DAYS
+    days = {DOW_INDEX[str(d).strip().lower()[:3]]
+            for d in value if str(d).strip().lower()[:3] in DOW_INDEX}
+    return frozenset(days) if days else ALL_DAYS
 
 
 class ShapeError(ValueError):
@@ -99,6 +125,8 @@ class StationStop:
     departure_min: int | None
     distance_km: float | None
     is_halt: bool
+    run_days: frozenset[int] = ALL_DAYS
+    train_type: str = ""
 
     @property
     def entry_time(self) -> int | None:
@@ -163,7 +191,15 @@ def parse_station_board(payload: Any) -> list[StationStop]:
                     if (d := _first(stop, "distance", "distanceFromOrigin", "km")) is not None
                     else None
                 ),
-                is_halt=bool(_first(stop, "isHalt", "halt", "isStopping") or False),
+                # Live responses use stopType (origin/halt/destination/
+                # pass-through) rather than a boolean.
+                is_halt=(
+                    str(stop_type).strip().lower() in HALT_STOP_TYPES
+                    if (stop_type := _first(stop, "stopType", "stop_type")) is not None
+                    else bool(_first(stop, "isHalt", "halt", "isStopping") or False)
+                ),
+                run_days=parse_run_days(_first(train, "runDays", "run_days", "days")),
+                train_type=str(_first(train, "type", "trainType") or "").strip(),
             )
         )
 
@@ -192,6 +228,11 @@ class Traversal:
     forward: bool  # True if travelling A -> B
     entry_min: int
     exit_min: int | None
+    run_days: frozenset[int] = ALL_DAYS
+    train_type: str = ""
+
+    def runs_on(self, day_of_week: int) -> bool:
+        return day_of_week in self.run_days
 
     @property
     def entry_hour(self) -> int:
@@ -248,18 +289,51 @@ def find_traversals(
                     forward=forward,
                     entry_min=entry,
                     exit_min=exit_stop.exit_time,
+                    run_days=stop_a.run_days & stop_b.run_days or stop_a.run_days,
+                    train_type=stop_a.train_type,
                 )
             )
     return traversals
 
 
-def hourly_profile(traversals: Iterable[Traversal]) -> list[float]:
-    """24-bin histogram of trains occupying the section, by hour of day."""
+def hourly_profile(
+    traversals: Iterable[Traversal], day_of_week: int | None = None
+) -> list[float]:
+    """24-bin histogram of trains occupying the section, by hour of day.
+
+    With `day_of_week` set, counts only trains that actually run that day.
+    """
     profile = [0.0] * HOURS
     for traversal in traversals:
+        if day_of_week is not None and not traversal.runs_on(day_of_week):
+            continue
         for hour in traversal.occupied_hours():
             profile[hour] += 1.0
     return profile
+
+
+def mean_profile(grid: list[list[float]]) -> list[float]:
+    """Average across the week: the traffic an arbitrary day actually sees.
+
+    The unfiltered histogram counts every train that traverses the section on
+    *any* day, which overstates any single day — on SBB-GZB, 482 distinct
+    trains against roughly 365 on a given day. Averaging the weekly grid
+    keeps the summary figure honest.
+    """
+    if not grid:
+        return [0.0] * HOURS
+    return [round(sum(day[h] for day in grid) / len(grid), 2) for h in range(HOURS)]
+
+
+def weekly_profile(traversals: Iterable[Traversal]) -> list[list[float]]:
+    """A real 7x24 traffic grid, indexed [day_of_week][hour].
+
+    This replaces hand-chosen day-of-week multipliers: RailRadar reports each
+    train's runDays, so weekend and weekday traffic are measured separately
+    rather than scaled from one another.
+    """
+    traversals = list(traversals)
+    return [hourly_profile(traversals, dow) for dow in range(DAYS)]
 
 
 def section_length_km(
@@ -300,10 +374,18 @@ class DerivedSection:
     profile: list[float]
     length_km: float | None
     traversals: list[Traversal]
+    profile_by_dow: list[list[float]] = field(default_factory=list)
 
     @property
-    def daily_trains(self) -> int:
+    def distinct_trains(self) -> int:
+        """Trains traversing on any day of the week."""
         return len(self.traversals)
+
+    @property
+    def daily_trains(self) -> float:
+        """Trains on an average day. Lower than distinct_trains, since not
+        every train runs daily."""
+        return round(sum(self.profile), 1)
 
     @property
     def peak_trains_per_hour(self) -> float:
@@ -328,13 +410,15 @@ def derive_section(
     board_a = parse_station_board(payload_a)
     board_b = parse_station_board(payload_b)
     traversals = find_traversals(board_a, board_b)
+    grid = weekly_profile(traversals)
     return DerivedSection(
         section_id=f"{station_a.upper()}-{station_b.upper()}",
         station_a=station_a.upper(),
         station_b=station_b.upper(),
-        profile=hourly_profile(traversals),
+        profile=mean_profile(grid),
         length_km=section_length_km(board_a, board_b),
         traversals=traversals,
+        profile_by_dow=grid,
     )
 
 

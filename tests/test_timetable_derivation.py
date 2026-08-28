@@ -201,7 +201,7 @@ def test_derive_section_end_to_end():
               entry("222", 7, "11:10", "11:15", 147))
     section = derive_section("NDLS", "DSA", a, b)
     assert section.section_id == "NDLS-DSA"
-    assert section.daily_trains == 2
+    assert section.daily_trains == pytest.approx(2)
     assert section.length_km == 7.0
     assert sum(section.profile) >= 2
     assert "NDLS-DSA" in section.summary()
@@ -255,3 +255,86 @@ def test_corridor_collapses_revisited_stations():
         route_payload(rstop(1, "A"), rstop(2, "B"), rstop(3, "A"), rstop(4, "C"))
     )
     assert corridor_from_route(route) == ["A", "B", "C"]
+
+
+# --- live-schema details ---------------------------------------------------
+
+
+def test_stop_type_maps_to_is_halt():
+    """Live responses use stopType, not an isHalt boolean."""
+    from src.ingest.timetable import parse_station_board
+
+    def with_type(stop_type):
+        e = entry("111", 2, "10:00", "10:02", 50)
+        e["stop"].pop("isHalt")
+        e["stop"]["stopType"] = stop_type
+        return parse_station_board(board(e))[0]
+
+    assert with_type("halt").is_halt is True
+    assert with_type("origin").is_halt is True
+    assert with_type("destination").is_halt is True
+    assert with_type("pass-through").is_halt is False
+
+
+def test_pass_through_trains_still_count_as_traffic():
+    """A train that does not stop still occupies the section."""
+    from src.ingest.timetable import find_traversals, parse_station_board
+
+    def side(seq, stop_type):
+        e = entry("111", seq, "10:00", "10:05", 50)
+        e["stop"].pop("isHalt")
+        e["stop"]["stopType"] = stop_type
+        return parse_station_board(board(e))
+
+    assert len(find_traversals(side(5, "pass-through"), side(6, "pass-through"))) == 1
+
+
+def test_parse_run_days():
+    from src.ingest.timetable import ALL_DAYS, parse_run_days
+
+    assert parse_run_days(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]) == ALL_DAYS
+    assert parse_run_days(["sun"]) == frozenset({6})
+    assert parse_run_days(["Mon", "FRI"]) == frozenset({0, 4})
+
+
+def test_missing_run_days_defaults_to_daily():
+    """Conservative: a parsing gap must never make a section look quieter."""
+    from src.ingest.timetable import ALL_DAYS, parse_run_days
+
+    assert parse_run_days(None) == ALL_DAYS
+    assert parse_run_days([]) == ALL_DAYS
+    assert parse_run_days(["nonsense"]) == ALL_DAYS
+
+
+def test_run_days_reach_the_traversal():
+    from src.ingest.timetable import find_traversals, parse_station_board
+
+    def side(seq, days):
+        e = entry("111", seq, "10:00", "10:05", 50)
+        e["train"]["runDays"] = days
+        return parse_station_board(board(e))
+
+    traversal = find_traversals(side(5, ["sat", "sun"]), side(6, ["sat", "sun"]))[0]
+    assert traversal.run_days == frozenset({5, 6})
+    assert traversal.runs_on(5) is True
+    assert traversal.runs_on(0) is False
+
+
+def test_weekly_profile_reflects_run_days():
+    """Sunday-only trains must not appear in Monday's profile."""
+    from src.ingest.timetable import Traversal, weekly_profile
+
+    daily = Traversal("1", "A", True, 9 * 60, 9 * 60 + 20)
+    sunday = Traversal("2", "B", True, 9 * 60, 9 * 60 + 20, run_days=frozenset({6}))
+    grid = weekly_profile([daily, sunday])
+    assert len(grid) == 7 and all(len(row) == 24 for row in grid)
+    assert grid[0][9] == 1  # Monday: daily train only
+    assert grid[6][9] == 2  # Sunday: both
+
+
+def test_derive_section_populates_weekly_grid():
+    a = board(entry("111", 5, "10:00", "10:05", 100))
+    b = board(entry("111", 6, "10:30", "10:32", 107))
+    section = derive_section("NDLS", "DSA", a, b)
+    assert len(section.profile_by_dow) == 7
+    assert all(len(row) == 24 for row in section.profile_by_dow)
