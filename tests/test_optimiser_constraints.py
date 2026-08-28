@@ -155,24 +155,33 @@ def test_solution_only_uses_permitted_slots():
 # --- constraint 1: NoOverlap on blocks -------------------------------------
 
 
-def test_overlapping_blocks_on_one_section_are_rejected():
+def test_blocks_on_a_section_cannot_overlap_by_construction():
+    """Non-overlap is structural, not a constraint the solver must enforce.
+
+    Each block is confined to one permitted run, and runs on a section are
+    maximal disjoint stretches, so two blocks on a section can never share a
+    slot. This test pins the structure that guarantees it — if candidate
+    blocks ever stop being run-scoped, it fails.
+    """
     instance = build_instance(
-        {"S1": NIGHT_QUIET}, [task("T1", "S1", 60), task("T2", "S1", 60)]
+        {"S1": NIGHT_QUIET},
+        [task("T1", "S1", 60), task("T2", "S1", 60)],
+        horizon_days=3,
     )
     planner = BlockPlanner(instance, time_limit=10)
-    grid = planner.grid
-    blocks = planner.block_vars["S1"]
-
-    status = solve_with(planner, lambda p: (
-        p.model.Add(blocks[0]["present"] == 1),
-        p.model.Add(blocks[1]["present"] == 1),
-        p.model.Add(blocks[0]["start"] == 0),
-        p.model.Add(blocks[0]["end"] == 2 * grid.slots_per_hour),
-        # Starts inside block 0 — overlapping, and must be refused.
-        p.model.Add(blocks[1]["start"] == 1 * grid.slots_per_hour),
-        p.model.Add(blocks[1]["end"] == 3 * grid.slots_per_hour),
-    ))
-    assert status == "INFEASIBLE"
+    spans = [b["run"] for b in planner.block_vars["S1"].values()]
+    assert len(spans) >= 2
+    ordered = sorted(spans)
+    for (_, end), (next_start, _) in zip(ordered, ordered[1:]):
+        assert end <= next_start, "candidate block runs overlap"
+    # And every scheduled block falls inside exactly one of those runs.
+    solution = planner.solve()
+    assert solution.feasible
+    for scheduled in solution.blocks:
+        assert any(
+            start <= scheduled.start_slot and scheduled.end_slot <= end
+            for start, end in spans
+        ), "a scheduled block escaped its permitted run"
 
 
 def test_blocks_never_overlap_in_a_solution():
@@ -235,12 +244,13 @@ def test_task_outside_its_block_is_rejected():
     instance = build_instance({"S1": NIGHT_QUIET}, [task("T1", "S1", 60)])
     planner = BlockPlanner(instance, time_limit=10)
     grid = planner.grid
-    blocks = planner.block_vars["S1"]
+    run_index = sorted(planner.block_vars["S1"])[0]
+    block = planner.block_vars["S1"][run_index]
     status = solve_with(planner, lambda p: (
         p.model.Add(p.task_present["T1"] == 1),
-        p.model.Add(p.assign[("T1", 0)] == 1),
-        p.model.Add(blocks[0]["start"] == 0),
-        p.model.Add(blocks[0]["end"] == 1 * grid.slots_per_hour),
+        p.model.Add(p.assign[("T1", run_index)] == 1),
+        p.model.Add(block["start"] == 0),
+        p.model.Add(block["end"] == 1 * grid.slots_per_hour),
         # Task starts after its block has already ended.
         p.model.Add(p.task_start["T1"] == 2 * grid.slots_per_hour),
     ))
@@ -291,15 +301,18 @@ def test_sharing_costs_less_than_separate_blocks():
         {"S1": NIGHT_SPARSE},
         [task("T1", "S1", 120, dept=Department.ENGG),
          task("T2", "S1", 120, dept=Department.SNT)],
+        horizon_days=2,
     )
     planner = BlockPlanner(instance, time_limit=20)
     merged = planner.solve()
     assert merged.feasible and len(merged.blocks) == 1
 
-    # Force the two tasks into separate blocks and compare.
+    # Force the two tasks into different runs, so they cannot share a block.
     separate = BlockPlanner(instance, time_limit=20)
-    separate.model.Add(separate.assign[("T1", 0)] == 1)
-    separate.model.Add(separate.assign[("T2", 1)] == 1)
+    runs = sorted(separate.block_vars["S1"])
+    assert len(runs) >= 2, "fixture needs at least two permitted runs"
+    separate.model.Add(separate.assign[("T1", runs[0])] == 1)
+    separate.model.Add(separate.assign[("T2", runs[1])] == 1)
     apart = separate.solve()
     assert apart.feasible
     assert merged.train_hours_lost < apart.train_hours_lost
@@ -380,18 +393,17 @@ def test_optimiser_prefers_the_quiet_hour():
 
 
 def test_first_block_is_not_forced_to_midnight():
-    """Regression: symmetry breaking must not leak into unused blocks.
+    """Regression from the earlier block-per-task formulation.
 
-    Absent blocks are pinned to slot 0. An unconditional ordering constraint
-    `start[i] <= start[i+1]` therefore reads as `start[i] <= 0` whenever a
-    later block goes unused, forcing every section's first block to start at
-    midnight. The model stays feasible and still reports OPTIMAL, which is
-    what makes this class of bug dangerous: it quietly deletes better
-    schedules.
+    Absent blocks were pinned to slot 0, so an unconditional ordering
+    constraint `start[i] <= start[i+1]` read as `start[i] <= 0` whenever a
+    later block went unused, forcing every section's first block to midnight.
+    The model stayed feasible and still reported OPTIMAL — which is what made
+    that class of bug dangerous: it quietly deleted better schedules.
 
-    Here midnight is permitted but costly, and 01:00 is free. Two tasks merge
-    into one block, leaving the second unused. The optimiser must be free to
-    start at 01:00.
+    Blocks are now scoped to permitted runs and there is no ordering
+    constraint at all, but the property is worth keeping pinned: midnight is
+    permitted here but costly, 01:00 is free, and the plan must use 01:00.
     """
     profile = [8.0] + [0.0] * 5 + [40.0] * 18
     instance = build_instance(

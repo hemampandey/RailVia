@@ -195,7 +195,7 @@ class GroundedTimetableSource(DataSource):
             tasks=tasks,
             traffic=self.build_traffic_windows(sections),
             crew_capacity=build_crew_capacity(
-                rng, self.horizon_start, self.horizon_days
+                rng, self.horizon_start, self.horizon_days, self.n_tasks
             ),
         )
         instance.validate_referential_integrity()

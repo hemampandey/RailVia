@@ -42,7 +42,8 @@ def sparkline(values: list[float]) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--from-train", help="derive the corridor from this train's route")
+    ap.add_argument("--from-train",
+                    help="derive corridors from these train routes (comma-separated)")
     ap.add_argument("--start", help="trim corridor to start at this station code")
     ap.add_argument("--end", help="trim corridor to end at this station code")
     ap.add_argument("--stations", help="comma-separated station codes in running order")
@@ -56,31 +57,36 @@ def main() -> int:
 
     client = RailRadarClient(run_budget=args.budget, offline=args.offline)
 
+    corridors: list[list[str]] = []
     try:
         if args.from_train:
-            route = parse_train_route(
-                client.train_details(args.from_train, halts_only=False)
-            )
-            codes = corridor_from_route(route, args.start, args.end)
-            print(f"corridor from train {args.from_train}: {len(codes)} stations")
+            for number in [n.strip() for n in args.from_train.split(",") if n.strip()]:
+                route = parse_train_route(client.train_details(number, halts_only=False))
+                codes = corridor_from_route(route, args.start, args.end)
+                print(f"corridor from train {number}: {len(codes)} stations")
+                print("  " + " -> ".join(codes))
+                corridors.append(codes)
         else:
-            codes = [c.strip().upper() for c in args.stations.split(",") if c.strip()]
+            corridors.append(
+                [c.strip().upper() for c in args.stations.split(",") if c.strip()]
+            )
 
-        if len(codes) < 2:
+        if any(len(c) < 2 for c in corridors):
             print("need at least 2 stations to form a section", file=sys.stderr)
             return 1
-        print("  " + " -> ".join(codes))
 
+        # One board per station, however many corridors touch it.
+        needed = list(dict.fromkeys(code for c in corridors for code in c))
+        print(f"\n{len(needed)} distinct stations to fetch")
         boards = {}
         names: dict[str, str] = {}
-        for code in codes:
+        for code in needed:
             payload = client.station_board(code, include_intermediate=True)
             boards[code] = payload
             body = payload.get("data") if isinstance(payload, dict) else None
             station = body.get("station") if isinstance(body, dict) else None
             if isinstance(station, dict) and station.get("name"):
                 names[code] = str(station["name"])
-            print(f"  fetched board: {code} ({names.get(code, code)})")
     except RailRadarError as exc:
         print(f"\nFAILED: {exc}", file=sys.stderr)
         if "API key" in str(exc):
@@ -89,11 +95,19 @@ def main() -> int:
 
     sections = []
     empty = []
-    for a, b in zip(codes, codes[1:]):
-        section = derive_section(a, b, boards[a], boards[b])
-        sections.append(section)
-        if section.daily_trains == 0:
-            empty.append(section.section_id)
+    seen: set[str] = set()
+    for codes in corridors:
+        for a, b in zip(codes, codes[1:]):
+            # Corridors overlap around Delhi; a shared section is one section.
+            key = "-".join(sorted((a, b)))
+            if key in seen:
+                continue
+            seen.add(key)
+            section = derive_section(a, b, boards[a], boards[b])
+            if section.daily_trains == 0:
+                empty.append(section.section_id)
+                continue
+            sections.append(section)
 
     print(f"\n{'section':14} {'trains/day':>10} {'peak/h':>7} {'quiet':>6} {'km':>7}  profile")
     print("-" * 92)
@@ -106,7 +120,8 @@ def main() -> int:
 
     if empty:
         print(
-            f"\nWARNING: no traversals found for {', '.join(empty)}.\n"
+            f"\nDROPPED {len(empty)} pair(s) with no traversals: "
+            f"{', '.join(empty[:8])}{'...' if len(empty) > 8 else ''}\n"
             "  Those station pairs are probably not physically adjacent, so no train\n"
             "  shows them with consecutive stop sequences. Use --from-train to derive\n"
             "  an adjacency-correct corridor instead of naming stations by hand."
@@ -118,7 +133,7 @@ def main() -> int:
         {
             "source": "RailRadar API (aggregates public Indian Railways NTES timetable)",
             "source_url": "https://railradar.in/docs",
-            "corridor": codes,
+            "corridors": corridors,
             "derived_from_train": args.from_train,
             "sections": [
                 {

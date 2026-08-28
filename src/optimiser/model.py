@@ -3,41 +3,46 @@
 Formulation in plain language
 -----------------------------
 *Tasks* are the work to be done. *Blocks* are the windows during which a
-section is handed over. Several tasks may share one block — that is the whole
-point of the project, and it is why NoOverlap is applied to blocks rather
-than to tasks. Forbidding two departments from working the same section at
-once would forbid exactly the coordination we are trying to demonstrate.
+section is handed to maintenance. Several tasks may share one block — that is
+the point of the project, and it is why cost is charged per block rather than
+per task. Two departments in one block pay once, so the optimiser discovers
+co-location without any bonus term to point at.
+
+The unit of scheduling is the **permitted run**: a maximal stretch of hours
+during which a section is quiet enough to block (see windows.py). Runs on a
+section are disjoint by construction, which does a lot of work for us.
 
 Variables
-  per task   start, end (duration fixed), present
-  per block  start, end, present, and one optional interval for NoOverlap
-  linking    assign[task, block] — which block carries which task
+  per task            start, end (duration fixed), present, an optional interval
+  per (section, run)  one candidate block: present, start, end, cost
+  linking             assign[task, run] — which run carries which task
 
 Constraints
-  1. Every present task is assigned to exactly one block on its own section,
-     and sits entirely inside it.
-  2. Blocks on the same section never overlap  (NoOverlap).
-  3. Each block lies inside one contiguous permitted window, so no block
-     straddles a peak period. Permitted windows come from windows.py.
-  4. Task start domains are pre-restricted to slots where the whole duration
-     fits in permitted time. Redundant given (1) and (3), but it prunes the
-     search early.
-  5. Everything finishes inside the horizon (implicit in the slot domains).
+  1. A present task is assigned to exactly one run on its own section, and
+     nests inside that run's block.
+  2. Blocks on a section never overlap. This holds by construction: runs are
+     disjoint and each run carries at most one block, so no NoOverlap
+     constraint is needed at all.
+  3. A block lies inside a single permitted run, so it cannot straddle a peak
+     period. Also by construction.
+  4. Crew capacity per department per day (Cumulative).
+  5. Deadlines, soft: lateness is measured in days and priced.
+  6. Work not co-locatable takes its block alone.
+  7. Everything finishes inside the horizon (implicit in run bounds).
 
-Objective  minimise
-     train-hours lost, summed over BLOCKS
-   + a penalty for every task left unscheduled
+Why runs are the unit
+---------------------
+The earlier formulation gave every task its own candidate block floating over
+the whole horizon, and expressed cost as a lookup into a cumulative-traffic
+array spanning every slot. On a 30-day, 39-section instance that meant ~1,800
+element constraints over 2,880-entry arrays. CP-SAT's presolve expanded them
+into millions of literals and could not find *any* feasible solution in 25
+seconds — with the objective removed entirely. Confining each block to one
+run shrinks every lookup to the length of that run (tens of entries) and
+deletes the NoOverlap and run-containment constraints outright.
 
-Cost is charged per block, never per task. Two departments sharing one block
-therefore pay once instead of twice, and the optimiser discovers co-location
-on its own — there is no bonus term to point at, which is what makes the
-result worth showing.
-
-Why the unscheduled penalty exists even in Phase 1: with a pure train-hours
-objective the cheapest schedule is the empty one, since doing nothing costs
-nothing. The penalty is flat here; Phase 3 replaces it with the criticality
-weight so that *which* task gets dropped becomes a judgement rather than an
-accident.
+Why an unscheduled penalty exists even with a pure train-hours objective:
+doing nothing costs nothing, so the empty schedule would be optimal.
 """
 
 from __future__ import annotations
@@ -51,8 +56,6 @@ from src.models import Department, PlanningInstance, Task
 from src.optimiser.windows import (
     DEFAULT_PERCENTILE,
     TimeGrid,
-    cumulative_train_hours,
-    feasible_starts,
     permitted_runs,
     permitted_slots,
     traffic_by_slot,
@@ -63,9 +66,11 @@ log = logging.getLogger(__name__)
 COST_SCALE = 100  # integer units per train-hour
 
 # Must exceed the cost of any single block, or dropping work would look
-# cheaper than doing it. Sized well above the worst case: a 6-hour block on
-# the busiest section costs roughly 130 train-hours.
+# cheaper than doing it.
 DEFAULT_UNSCHEDULED_PENALTY = 100_000
+
+# Cost of finishing one day past the mandated date, per unit of criticality.
+DEFAULT_LATE_PENALTY_PER_DAY = 2_000
 
 DEFAULT_TIME_LIMIT_SECONDS = 60.0  # A live demo cannot wait longer.
 
@@ -94,6 +99,7 @@ class Solution:
     wall_time: float
     best_bound: float
     impossible_task_ids: list[str] = field(default_factory=list)
+    late_days: dict[str, int] = field(default_factory=dict)
 
     @property
     def feasible(self) -> bool:
@@ -107,6 +113,19 @@ class Solution:
     def scheduled_count(self) -> int:
         return sum(len(b.task_ids) for b in self.blocks)
 
+    @property
+    def total_days_late(self) -> int:
+        return sum(self.late_days.values())
+
+    @property
+    def late_task_count(self) -> int:
+        return sum(1 for v in self.late_days.values() if v > 0)
+
+    @property
+    def peak_hour_blocks(self) -> int:
+        """Always 0 for our planner; the baseline reports its own count."""
+        return 0
+
 
 class BlockPlanner:
     """Builds and solves the CP-SAT model for one planning instance."""
@@ -118,22 +137,33 @@ class BlockPlanner:
         unscheduled_penalty: int = DEFAULT_UNSCHEDULED_PENALTY,
         time_limit: float = DEFAULT_TIME_LIMIT_SECONDS,
         slot_minutes: int = 15,
+        criticality: dict[str, float] | None = None,
+        enforce_crew: bool = True,
+        enforce_deadlines: bool = True,
+        late_penalty_per_day: int = DEFAULT_LATE_PENALTY_PER_DAY,
+        with_objective: bool = True,
     ) -> None:
         self.instance = instance
         self.percentile = percentile
         self.unscheduled_penalty = unscheduled_penalty
         self.time_limit = time_limit
-        self.grid = TimeGrid(instance.horizon_start, instance.horizon_days, slot_minutes)
+        # Criticality in [0,1] scales both penalties. Defaults to 1.0 so the
+        # model behaves identically until the Phase 3 scorer supplies weights.
+        self.criticality = criticality or {t.id: 1.0 for t in instance.tasks}
+        self.enforce_crew = enforce_crew
+        self.enforce_deadlines = enforce_deadlines
+        self.late_penalty_per_day = late_penalty_per_day
+        # Diagnostic switch: solving without the objective separates "the
+        # constraints cannot be satisfied" from "the search cannot optimise in
+        # time". The two need different fixes.
+        self.with_objective = with_objective
 
+        self.grid = TimeGrid(instance.horizon_start, instance.horizon_days, slot_minutes)
         self.traffic = traffic_by_slot(instance, self.grid)
         self.permitted = {
             sid: permitted_slots(series, percentile) for sid, series in self.traffic.items()
         }
         self.runs = {sid: permitted_runs(p) for sid, p in self.permitted.items()}
-        self.cumulative = {
-            sid: cumulative_train_hours(series, self.grid, COST_SCALE)
-            for sid, series in self.traffic.items()
-        }
 
         self.model = cp_model.CpModel()
         self._build()
@@ -149,16 +179,29 @@ class BlockPlanner:
             grouped.setdefault(task.section_id, []).append(task)
         return grouped
 
+    def _run_cumulative(self, section_id: str, run: tuple[int, int]) -> list[int]:
+        """Prefix sums of train-hours across one run, so a block's cost is one
+        subtraction over an array tens of entries long rather than thousands."""
+        start, end = run
+        series = self.traffic[section_id]
+        cumulative = [0]
+        total = 0
+        for slot in range(start, end):
+            total += round(series[slot] * self.grid.slot_hours * COST_SCALE)
+            cumulative.append(total)
+        return cumulative
+
     # -- model ---------------------------------------------------------------
 
     def _build(self) -> None:
         model = self.model
-        horizon = self.grid.n_slots
         self.task_start: dict[str, cp_model.IntVar] = {}
         self.task_end: dict[str, cp_model.IntVar] = {}
         self.task_present: dict[str, cp_model.IntVar] = {}
+        self.task_interval: dict[str, object] = {}
         self.assign: dict[tuple[str, int], cp_model.IntVar] = {}
-        self.block_vars: dict[str, list[dict]] = {}
+        self.block_vars: dict[str, dict[int, dict]] = {}
+        self.late_days_var: dict[str, cp_model.IntVar] = {}
         self.impossible: list[str] = []
 
         grouped = self._tasks_by_section()
@@ -166,141 +209,245 @@ class BlockPlanner:
         for section_id, tasks in grouped.items():
             if not tasks:
                 continue
-            permitted = self.permitted[section_id]
             runs = self.runs[section_id]
+            blocks: dict[int, dict] = {}
+
+            # Which runs could host which tasks. A run shorter than the task
+            # is pruned outright, which keeps the assignment matrix small.
+            eligible: dict[str, list[int]] = {}
+            for task in tasks:
+                length = self.duration_slots(task)
+                eligible[task.id] = [
+                    index for index, (start, end) in enumerate(runs)
+                    if end - start >= length
+                ]
+
+            used_runs = sorted({r for indices in eligible.values() for r in indices})
+
+            # --- one candidate block per usable run ---
+            for run_index in used_runs:
+                run_start, run_end = runs[run_index]
+                present = model.NewBoolVar(f"blk_{section_id}_{run_index}")
+                start = model.NewIntVar(run_start, run_end, f"blks_{section_id}_{run_index}")
+                end = model.NewIntVar(run_start, run_end, f"blke_{section_id}_{run_index}")
+                model.Add(end >= start)
+                model.Add(start == run_start).OnlyEnforceIf(present.Not())
+                model.Add(end == run_start).OnlyEnforceIf(present.Not())
+                blocks[run_index] = {
+                    "present": present, "start": start, "end": end,
+                    "run": (run_start, run_end),
+                }
+            self.block_vars[section_id] = blocks
 
             # --- task variables ---
             for task in tasks:
                 length = self.duration_slots(task)
-                starts = feasible_starts(permitted, length)
                 present = model.NewBoolVar(f"present_{task.id}")
                 self.task_present[task.id] = present
 
-                if not starts:
-                    # No permitted window is long enough for this task. Say so
-                    # rather than letting an unexplained infeasibility surface.
+                if not eligible[task.id]:
+                    # No permitted window is long enough. Say so, rather than
+                    # letting an unexplained infeasibility surface later.
                     model.Add(present == 0)
                     self.impossible.append(task.id)
                     start = model.NewIntVar(0, 0, f"start_{task.id}")
                     end = model.NewIntVar(0, 0, f"end_{task.id}")
+                    length = 0
                 else:
-                    start = model.NewIntVarFromDomain(
-                        cp_model.Domain.FromValues(starts), f"start_{task.id}"
-                    )
-                    end = model.NewIntVar(0, horizon, f"end_{task.id}")
+                    lo = min(runs[r][0] for r in eligible[task.id])
+                    hi = max(runs[r][1] for r in eligible[task.id])
+                    start = model.NewIntVar(lo, max(lo, hi - length), f"start_{task.id}")
+                    end = model.NewIntVar(lo, hi, f"end_{task.id}")
                     model.Add(end == start + length)
                 self.task_start[task.id] = start
                 self.task_end[task.id] = end
-
-            # --- block variables: at most one block per task on this section ---
-            blocks = []
-            for index in range(len(tasks)):
-                b_present = model.NewBoolVar(f"blk_{section_id}_{index}_present")
-                b_start = model.NewIntVar(0, horizon, f"blk_{section_id}_{index}_start")
-                b_end = model.NewIntVar(0, horizon, f"blk_{section_id}_{index}_end")
-                b_size = model.NewIntVar(0, horizon, f"blk_{section_id}_{index}_size")
-                model.Add(b_size == b_end - b_start)
-                interval = model.NewOptionalIntervalVar(
-                    b_start, b_size, b_end, b_present, f"blk_{section_id}_{index}_iv"
+                self.task_interval[task.id] = model.NewOptionalIntervalVar(
+                    start, length, end, present, f"iv_{task.id}"
                 )
-                # An absent block is pinned to zero so it cannot drift and
-                # cannot contribute cost.
-                model.Add(b_start == 0).OnlyEnforceIf(b_present.Not())
-                model.Add(b_end == 0).OnlyEnforceIf(b_present.Not())
-                blocks.append(
-                    {
-                        "present": b_present, "start": b_start, "end": b_end,
-                        "size": b_size, "interval": interval,
-                    }
-                )
-            self.block_vars[section_id] = blocks
 
-            # Constraint 2: blocks on one section never overlap.
-            model.AddNoOverlap([b["interval"] for b in blocks])
-
-            # Constraint 3: each present block sits inside ONE permitted run,
-            # so a block cannot straddle a peak period even if both its tasks
-            # are individually in quiet windows.
-            for index, block in enumerate(blocks):
-                if not runs:
-                    model.Add(block["present"] == 0)
-                    continue
-                choices = []
-                for run_index, (run_start, run_end) in enumerate(runs):
-                    chosen = model.NewBoolVar(f"blk_{section_id}_{index}_run{run_index}")
-                    model.Add(block["start"] >= run_start).OnlyEnforceIf(chosen)
-                    model.Add(block["end"] <= run_end).OnlyEnforceIf(chosen)
-                    choices.append(chosen)
-                model.AddExactlyOne(choices).OnlyEnforceIf(block["present"])
-                for chosen in choices:
-                    model.AddImplication(chosen, block["present"])
-
-            # Constraint 1: every present task occupies exactly one block on
-            # its section, and nests inside it.
-            for task in tasks:
+                # Constraint 1: exactly one run carries a scheduled task.
                 literals = []
-                for index, block in enumerate(blocks):
-                    chosen = model.NewBoolVar(f"assign_{task.id}_{index}")
-                    self.assign[(task.id, index)] = chosen
-                    model.Add(self.task_start[task.id] >= block["start"]).OnlyEnforceIf(chosen)
-                    model.Add(self.task_end[task.id] <= block["end"]).OnlyEnforceIf(chosen)
+                for run_index in eligible[task.id]:
+                    block = blocks[run_index]
+                    chosen = model.NewBoolVar(f"assign_{task.id}_{run_index}")
+                    self.assign[(task.id, run_index)] = chosen
+                    model.Add(start >= block["start"]).OnlyEnforceIf(chosen)
+                    model.Add(end <= block["end"]).OnlyEnforceIf(chosen)
                     model.AddImplication(chosen, block["present"])
                     literals.append(chosen)
-                model.Add(sum(literals) == 1).OnlyEnforceIf(self.task_present[task.id])
-                model.Add(sum(literals) == 0).OnlyEnforceIf(self.task_present[task.id].Not())
+                if literals:
+                    model.Add(sum(literals) == 1).OnlyEnforceIf(present)
+                    model.Add(sum(literals) == 0).OnlyEnforceIf(present.Not())
 
             # A block exists only to carry work.
-            for index, block in enumerate(blocks):
-                carried = [self.assign[(t.id, index)] for t in tasks]
-                model.AddBoolOr(carried).OnlyEnforceIf(block["present"])
-                for literal in carried:
-                    model.AddImplication(literal, block["present"])
+            for run_index, block in blocks.items():
+                carried = [
+                    self.assign[(t.id, run_index)]
+                    for t in tasks if (t.id, run_index) in self.assign
+                ]
+                if carried:
+                    model.AddBoolOr(carried).OnlyEnforceIf(block["present"])
+                else:
+                    model.Add(block["present"] == 0)
 
-            # Symmetry breaking: interchangeable blocks would otherwise be
-            # permuted endlessly. Unused blocks are packed at the tail, and
-            # blocks in use run in increasing start order.
-            #
-            # The ordering MUST be conditional on both blocks being present.
-            # Absent blocks are pinned to slot 0, so an unconditional
-            # `start[i] <= start[i+1]` would read as `start[i] <= 0` whenever
-            # a later block goes unused, forcing every section's first block
-            # to begin at midnight and silently excluding better schedules.
-            for index in range(len(blocks) - 1):
-                model.AddImplication(
-                    blocks[index + 1]["present"], blocks[index]["present"]
+            # Constraint 6: heavy machinery occupies the whole section, so
+            # such work cannot share its block (ASSUMPTIONS.md A-10).
+            for task in tasks:
+                if task.co_locatable:
+                    continue
+                for run_index in eligible[task.id]:
+                    mine = self.assign[(task.id, run_index)]
+                    for other in tasks:
+                        if other.id == task.id:
+                            continue
+                        theirs = self.assign.get((other.id, run_index))
+                        if theirs is not None:
+                            model.AddBoolOr([mine.Not(), theirs.Not()])
+
+        self._build_crew_capacity()
+        self._build_deadlines()
+        if self.with_objective:
+            self._build_objective()
+        else:
+            self._build_cost_vars()
+
+    def _build_crew_capacity(self) -> None:
+        """Constraint 4: a department cannot field more crews than it has.
+
+        One Cumulative per department over that department's task intervals,
+        with `crew_required` as the demand.
+
+        Capacity varies by day and Cumulative takes a single capacity, so we
+        set capacity to the department's best day and lay a fixed blocking
+        interval across every weaker day carrying the shortfall as demand. A
+        day with 1 of 3 crews therefore starts with 2 already consumed.
+        """
+        if not self.enforce_crew:
+            return
+        model = self.model
+        grid = self.grid
+        by_dept_day: dict[tuple[Department, int], int] = {}
+        for record in self.instance.crew_capacity:
+            offset = (record.date - self.instance.horizon_start).days
+            if 0 <= offset < self.instance.horizon_days:
+                by_dept_day[(record.department, offset)] = record.available_crews
+
+        self.crew_ceiling: dict[Department, int] = {}
+        for dept in Department:
+            tasks = [t for t in self.instance.tasks if t.department == dept]
+            if not tasks:
+                continue
+            caps = [
+                by_dept_day.get((dept, day), 0)
+                for day in range(self.instance.horizon_days)
+            ]
+            ceiling = max(caps) if caps else 0
+            self.crew_ceiling[dept] = ceiling
+            if ceiling <= 0:
+                for task in tasks:
+                    model.Add(self.task_present[task.id] == 0)
+                continue
+
+            intervals = [self.task_interval[t.id] for t in tasks]
+            demands = [t.crew_required for t in tasks]
+            for day, cap in enumerate(caps):
+                shortfall = ceiling - cap
+                if shortfall <= 0:
+                    continue
+                start = day * grid.slots_per_day
+                intervals.append(
+                    model.NewIntervalVar(
+                        start, grid.slots_per_day, start + grid.slots_per_day,
+                        f"crewgap_{dept.value}_{day}",
+                    )
                 )
-                model.Add(
-                    blocks[index]["start"] <= blocks[index + 1]["start"]
-                ).OnlyEnforceIf(
-                    [blocks[index]["present"], blocks[index + 1]["present"]]
-                )
+                demands.append(shortfall)
+            model.AddCumulative(intervals, demands, ceiling)
 
-        self._build_objective()
+            # Work needing more crews than the department ever has can never
+            # run. Report it rather than returning a bare INFEASIBLE.
+            for task in tasks:
+                if task.crew_required > ceiling:
+                    model.Add(self.task_present[task.id] == 0)
+                    if task.id not in self.impossible:
+                        self.impossible.append(task.id)
 
-    def _build_objective(self) -> None:
+    def _build_deadlines(self) -> None:
+        """Constraint 5: work should finish by its mandated date.
+
+        Soft, not hard. A hard deadline over an already-overdue backlog makes
+        the model INFEASIBLE and tells the planner nothing. Lateness is
+        measured in days and priced, so the solver chooses what to defer and
+        we can see what it chose.
+
+        Tasks already overdue when the horizon opens accrue lateness from
+        their original due date, so they carry the largest penalties.
+        """
+        if not self.enforce_deadlines:
+            return
+        model = self.model
+        grid = self.grid
+        horizon_days = self.instance.horizon_days
+
+        for task in self.instance.tasks:
+            due_day = (task.due_date - self.instance.horizon_start).days
+            end_day = model.NewIntVar(0, horizon_days, f"endday_{task.id}")
+            model.AddDivisionEquality(end_day, self.task_end[task.id], grid.slots_per_day)
+            ceiling = max(0, horizon_days - due_day) + 1
+            late = model.NewIntVar(0, ceiling, f"late_{task.id}")
+            present = self.task_present[task.id]
+            model.Add(late >= end_day - due_day).OnlyEnforceIf(present)
+            model.Add(late == 0).OnlyEnforceIf(present.Not())
+            self.late_days_var[task.id] = late
+
+    def _build_cost_vars(self) -> list:
+        """Per-block train-hours. Always built, so a schedule can be costed
+        even when solved without an objective."""
         model = self.model
         terms = []
         self.block_cost: dict[tuple[str, int], cp_model.IntVar] = {}
 
         for section_id, blocks in self.block_vars.items():
-            cumulative = self.cumulative[section_id]
-            ceiling = max(cumulative)
-            for index, block in enumerate(blocks):
-                at_start = model.NewIntVar(0, ceiling, f"cum_s_{section_id}_{index}")
-                at_end = model.NewIntVar(0, ceiling, f"cum_e_{section_id}_{index}")
-                # cost = cum[end] - cum[start]: the train-hours lost across
-                # every slot the block occupies.
-                model.AddElement(block["start"], cumulative, at_start)
-                model.AddElement(block["end"], cumulative, at_end)
-                cost = model.NewIntVar(0, ceiling, f"cost_{section_id}_{index}")
+            for run_index, block in blocks.items():
+                run_start, run_end = block["run"]
+                cumulative = self._run_cumulative(section_id, (run_start, run_end))
+                ceiling = cumulative[-1]
+
+                # Offsets within the run: the lookup array is the length of
+                # this run, not of the whole horizon.
+                offset_start = model.NewIntVar(0, run_end - run_start, f"os_{section_id}_{run_index}")
+                offset_end = model.NewIntVar(0, run_end - run_start, f"oe_{section_id}_{run_index}")
+                model.Add(offset_start == block["start"] - run_start)
+                model.Add(offset_end == block["end"] - run_start)
+
+                at_start = model.NewIntVar(0, ceiling, f"cs_{section_id}_{run_index}")
+                at_end = model.NewIntVar(0, ceiling, f"ce_{section_id}_{run_index}")
+                model.AddElement(offset_start, cumulative, at_start)
+                model.AddElement(offset_end, cumulative, at_end)
+
+                cost = model.NewIntVar(0, ceiling, f"cost_{section_id}_{run_index}")
                 model.Add(cost == at_end - at_start)
-                self.block_cost[(section_id, index)] = cost
+                self.block_cost[(section_id, run_index)] = cost
                 terms.append(cost)
+        return terms
 
+    def _build_objective(self) -> None:
+        terms = self._build_cost_vars()
+
+        # Criticality scales both penalties, so the model defers the work it
+        # can most afford to defer rather than whatever is cheapest to move.
+        # Weights are 1.0 until the Phase 3 scorer supplies them.
         for task_id, present in self.task_present.items():
-            terms.append(self.unscheduled_penalty * (1 - present))
+            weight = max(0.0, min(1.0, self.criticality.get(task_id, 1.0)))
+            penalty = int(self.unscheduled_penalty * (0.2 + 0.8 * weight))
+            terms.append(penalty * (1 - present))
 
-        model.Minimize(sum(terms))
+        for task_id, late in self.late_days_var.items():
+            weight = max(0.0, min(1.0, self.criticality.get(task_id, 1.0)))
+            cost = int(self.late_penalty_per_day * (0.2 + 0.8 * weight))
+            terms.append(cost * late)
+
+        self.model.Minimize(sum(terms))
 
     # -- solve ---------------------------------------------------------------
 
@@ -311,20 +458,22 @@ class BlockPlanner:
         solver.parameters.log_search_progress = log_search
         status = solver.Solve(self.model)
         status_name = solver.StatusName(status)
+        ok = status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
 
         log.info(
             "solver status=%s objective=%s bound=%s wall=%.2fs",
             status_name,
-            solver.ObjectiveValue() if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None,
-            solver.BestObjectiveBound() if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None,
+            solver.ObjectiveValue() if ok and self.with_objective else None,
+            solver.BestObjectiveBound() if ok and self.with_objective else None,
             solver.WallTime(),
         )
 
-        if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        if not ok:
             return Solution(
-                status=status_name, blocks=[], unscheduled_task_ids=
-                [t.id for t in self.instance.tasks], train_hours_lost=0.0,
-                objective=0.0, wall_time=solver.WallTime(), best_bound=0.0,
+                status=status_name, blocks=[],
+                unscheduled_task_ids=[t.id for t in self.instance.tasks],
+                train_hours_lost=0.0, objective=0.0,
+                wall_time=solver.WallTime(), best_bound=0.0,
                 impossible_task_ids=list(self.impossible),
             )
 
@@ -332,25 +481,30 @@ class BlockPlanner:
         blocks: list[ScheduledBlock] = []
         train_hours = 0.0
 
-        for section_id, block_list in self.block_vars.items():
-            for index, block in enumerate(block_list):
+        for section_id, block_map in self.block_vars.items():
+            for run_index, block in block_map.items():
                 if not solver.Value(block["present"]):
                     continue
                 carried = [
-                    task_id for (task_id, block_index), literal in self.assign.items()
-                    if block_index == index
+                    task_id for (task_id, index), literal in self.assign.items()
+                    if index == run_index
                     and tasks_by_id[task_id].section_id == section_id
                     and solver.Value(literal)
                 ]
                 if not carried:
                     continue
-                cost = solver.Value(self.block_cost[(section_id, index)]) / COST_SCALE
+                cost = solver.Value(self.block_cost[(section_id, run_index)]) / COST_SCALE
                 train_hours += cost
+                # Shrink the reported block to the work it actually carries:
+                # the solver has no incentive to tighten bounds beyond cost,
+                # and a block wider than its tasks would misreport the plan.
+                start = min(solver.Value(self.task_start[t]) for t in carried)
+                end = max(solver.Value(self.task_end[t]) for t in carried)
                 blocks.append(
                     ScheduledBlock(
                         section_id=section_id,
-                        start_slot=solver.Value(block["start"]),
-                        end_slot=solver.Value(block["end"]),
+                        start_slot=start,
+                        end_slot=end,
                         task_ids=sorted(carried),
                         departments=sorted(
                             {tasks_by_id[t].department for t in carried},
@@ -364,13 +518,19 @@ class BlockPlanner:
         unscheduled = [
             t.id for t in self.instance.tasks if not solver.Value(self.task_present[t.id])
         ]
+        late_days = {
+            task_id: solver.Value(var)
+            for task_id, var in self.late_days_var.items()
+            if solver.Value(self.task_present[task_id]) and solver.Value(var) > 0
+        }
         return Solution(
             status=status_name,
             blocks=blocks,
             unscheduled_task_ids=unscheduled,
+            late_days=late_days,
             train_hours_lost=round(train_hours, 3),
-            objective=solver.ObjectiveValue(),
+            objective=solver.ObjectiveValue() if self.with_objective else 0.0,
             wall_time=solver.WallTime(),
-            best_bound=solver.BestObjectiveBound(),
+            best_bound=solver.BestObjectiveBound() if self.with_objective else 0.0,
             impossible_task_ids=list(self.impossible),
         )

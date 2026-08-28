@@ -12,7 +12,7 @@ from __future__ import annotations
 import random
 from datetime import date, datetime, timedelta
 
-from src.generator.catalogue import CATALOGUE, ActivitySpec
+from src.generator.catalogue import CATALOGUE, ActivitySpec, by_department
 from src.generator.sections import archetype_of, build_sections
 from src.models import (
     CrewCapacity,
@@ -41,12 +41,26 @@ DOW_MULTIPLIER: tuple[float, ...] = (1.00, 1.00, 1.00, 1.00, 1.05, 0.90, 0.75)
 GOODS_HOURS = range(22, 24)
 GOODS_HOURS_EARLY = range(0, 5)
 
-# Crews a department can field per day on a division of this size.
-# PROVISIONAL, see ASSUMPTIONS.md (A-06).
-CREWS_PER_DEPARTMENT: dict[Department, tuple[int, int]] = {
-    Department.ENGG: (2, 3),
-    Department.TRD: (1, 2),
-    Department.SNT: (1, 2),
+# Crews a department can field per day, expressed as a share of the daily
+# task load rather than a fixed count: a 40-section division does not run on
+# the same establishment as a 5-section one. Tuned so capacity binds on some
+# days without making the backlog impossible. PROVISIONAL, ASSUMPTIONS.md (A-06).
+CREW_SHARE: dict[Department, float] = {
+    Department.ENGG: 0.55,
+    Department.TRD: 0.45,
+    Department.SNT: 0.45,
+}
+MIN_CREWS_PER_DEPARTMENT = 2
+
+# Departments are sampled uniformly, then an activity is drawn within the
+# chosen department. Sampling activities directly from the flat catalogue
+# skews the mix towards whichever department has most activity types listed
+# (5 ENGG vs 4 S&T vs 3 TRD), which understated TRD badly in Phase 0.
+# See ASSUMPTIONS.md (A-16).
+DEPARTMENT_WEIGHTS: dict[Department, float] = {
+    Department.ENGG: 0.45,  # Track work dominates real maintenance volume
+    Department.TRD: 0.25,
+    Department.SNT: 0.30,
 }
 
 # How the backlog is distributed. Roughly a quarter of pending work is already
@@ -160,18 +174,26 @@ def _build_traffic(
 
 
 def _build_crew_capacity(
-    rng: random.Random, horizon_start: date, horizon_days: int
+    rng: random.Random,
+    horizon_start: date,
+    horizon_days: int,
+    n_tasks: int = 20,
 ) -> list[CrewCapacity]:
     capacity: list[CrewCapacity] = []
+    tasks_per_day = max(1.0, n_tasks / max(1, horizon_days))
     for day_offset in range(horizon_days):
         day = horizon_start + timedelta(days=day_offset)
-        for dept, (lo, hi) in CREWS_PER_DEPARTMENT.items():
-            crews = rng.randint(lo, hi)
+        for dept, share in CREW_SHARE.items():
+            base = max(MIN_CREWS_PER_DEPARTMENT, round(tasks_per_day * share))
+            crews = base + rng.randint(-1, 1)
             # Sunday: reduced establishment.
             if day.weekday() == 6:
-                crews = max(1, crews - 1)
+                crews -= 1
             capacity.append(
-                CrewCapacity(department=dept, date=day, available_crews=crews)
+                CrewCapacity(
+                    department=dept, date=day,
+                    available_crews=max(MIN_CREWS_PER_DEPARTMENT, crews),
+                )
             )
     return capacity
 
@@ -188,10 +210,15 @@ def generate_tasks(
     Split out from generate_instance so the same backlog logic can be laid
     over real, timetable-derived sections. See src/adapters/hybrid.py.
     """
+    departments = list(DEPARTMENT_WEIGHTS)
+    weights = [DEPARTMENT_WEIGHTS[d] for d in departments]
+    catalogue_by_dept = {d: by_department(d) for d in departments}
+
     tasks: list[Task] = []
     for idx in range(1, n_tasks + 1):
         section = rng.choice(sections)
-        spec = rng.choice(CATALOGUE)
+        dept = rng.choices(departments, weights=weights, k=1)[0]
+        spec = rng.choice(catalogue_by_dept[dept])
         tasks.append(_make_task(rng, idx, section, spec, horizon_start, horizon_days))
     return tasks
 
@@ -204,10 +231,10 @@ def build_traffic(
 
 
 def build_crew_capacity(
-    rng: random.Random, horizon_start: date, horizon_days: int
+    rng: random.Random, horizon_start: date, horizon_days: int, n_tasks: int = 20
 ) -> list[CrewCapacity]:
     """Public wrapper for crew capacity generation."""
-    return _build_crew_capacity(rng, horizon_start, horizon_days)
+    return _build_crew_capacity(rng, horizon_start, horizon_days, n_tasks)
 
 
 def generate_instance(
@@ -243,7 +270,7 @@ def generate_instance(
         sections=sections,
         tasks=tasks,
         traffic=_build_traffic(sections, horizon_start, horizon_days),
-        crew_capacity=_build_crew_capacity(rng, horizon_start, horizon_days),
+        crew_capacity=_build_crew_capacity(rng, horizon_start, horizon_days, n_tasks),
     )
     instance.validate_referential_integrity()
     return instance

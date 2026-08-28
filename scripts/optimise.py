@@ -125,8 +125,13 @@ def main() -> int:
         tasks_by_id[t].department.value for b in solution.blocks for t in b.task_ids
     )
     print(f"  by department         : " + "  ".join(f"{k} {v}" for k, v in sorted(by_dept.items())))
+    if solution.late_days:
+        print(f"  tasks finishing late  : {solution.late_task_count} "
+              f"({solution.total_days_late} task-days)")
     if solution.unscheduled_task_ids:
-        print(f"  UNSCHEDULED           : {', '.join(solution.unscheduled_task_ids)}")
+        ids = solution.unscheduled_task_ids
+        shown = ", ".join(ids[:12]) + ("..." if len(ids) > 12 else "")
+        print(f"  UNSCHEDULED           : {len(ids)} ({shown})")
     if solution.impossible_task_ids:
         print(f"  no window long enough : {', '.join(solution.impossible_task_ids)}")
     print()

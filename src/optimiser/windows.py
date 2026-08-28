@@ -161,3 +161,30 @@ def cumulative_train_hours(series: list[float], grid: TimeGrid, scale: int = 100
         total += round(value * grid.slot_hours * scale)
         cumulative.append(total)
     return cumulative
+
+
+def run_end_index(permitted: list[bool]) -> list[int]:
+    """For each slot, the exclusive end of the permitted run containing it.
+
+    Lets the model express "this block lies inside one contiguous permitted
+    window" as a single element lookup plus an inequality:
+
+        run_end = RUN_END[block_start]
+        block_end <= run_end
+
+    The alternative — one boolean per candidate run per block — produced
+    roughly 19,000 booleans on a 30-day, 39-section instance and the solver
+    could not find any feasible schedule inside 60 seconds.
+
+    Forbidden slots map to themselves, so a block can never start on one.
+    """
+    n = len(permitted)
+    ends = [0] * n
+    end_of_run = n
+    for index in range(n - 1, -1, -1):
+        if not permitted[index]:
+            end_of_run = index
+            ends[index] = index
+        else:
+            ends[index] = end_of_run
+    return ends

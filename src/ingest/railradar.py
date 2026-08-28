@@ -19,6 +19,7 @@ Design constraints:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import pathlib
 import time
@@ -28,6 +29,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import date
 
+log = logging.getLogger(__name__)
+
 BASE_URL = "https://api.railradar.in/v1"
 ENV_VAR = "RAILRADAR_API_KEY"
 DEFAULT_CACHE_DIR = pathlib.Path("data/cache/railradar")
@@ -35,6 +38,16 @@ USER_AGENT = "SIH26027-block-planner/0.1 (academic project; contact via repo)"
 
 # Free sandbox tier, per RailRadar developer docs (fetched 2026-08-28).
 FREE_TIER_MONTHLY_REQUESTS = 1000
+
+# Observed live, and NOT in the published docs: the API returns HTTP 429
+# "Maximum 10 requests per minute" above this rate. We self-throttle rather
+# than discover it by being refused, and leave a margin.
+MAX_REQUESTS_PER_MINUTE = 10
+MIN_REQUEST_INTERVAL = 60.0 / MAX_REQUESTS_PER_MINUTE + 0.5
+
+# A 429 means the minute window is full; waiting less than the window is
+# pointless. Backoff of 2/4/8s never clears it.
+RATE_LIMIT_COOLDOWN = 62.0
 # Leave headroom: never spend the whole allowance in one sitting.
 DEFAULT_RUN_BUDGET = 60
 
@@ -169,6 +182,7 @@ class RailRadarClient:
         self.budget = RequestBudget(
             path=self.cache_dir / "_budget.json", run_budget=run_budget
         )
+        self._last_request_at: float = 0.0
 
     # -- cache ---------------------------------------------------------------
 
@@ -212,9 +226,17 @@ class RailRadarClient:
         cache_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
         return payload
 
-    def _request_with_retries(self, url: str, attempts: int = 3) -> dict:
+    def _throttle(self) -> None:
+        """Keep under the 10-per-minute ceiling without being told."""
+        elapsed = time.monotonic() - self._last_request_at
+        if self._last_request_at and elapsed < MIN_REQUEST_INTERVAL:
+            time.sleep(MIN_REQUEST_INTERVAL - elapsed)
+
+    def _request_with_retries(self, url: str, attempts: int = 4) -> dict:
         last: Exception | None = None
         for attempt in range(attempts):
+            self._throttle()
+            self._last_request_at = time.monotonic()
             request = urllib.request.Request(
                 url,
                 headers={
@@ -236,9 +258,15 @@ class RailRadarClient:
                 if exc.code == 404:
                     raise RailRadarError(f"HTTP 404 — not found: {url}. {body}") from exc
                 if exc.code in (429, 503):
-                    # Rate limited or unavailable: back off, then retry.
-                    wait = 2 ** (attempt + 1)
+                    # 429 means the per-minute window is full: wait it out
+                    # rather than hammering with a short backoff.
+                    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                    if exc.code == 429:
+                        wait = float(retry_after) if retry_after else RATE_LIMIT_COOLDOWN
+                    else:
+                        wait = 2 ** (attempt + 1)
                     last = RailRadarError(f"HTTP {exc.code} — {body}")
+                    log.warning("HTTP %s, waiting %.0fs before retry", exc.code, wait)
                     time.sleep(wait)
                     continue
                 raise RailRadarError(f"HTTP {exc.code} — {body}") from exc
