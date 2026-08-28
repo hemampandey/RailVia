@@ -13,4 +13,3 @@ data/instance.json
 .env
 .env.local
 *.key
-demo_run.txt
