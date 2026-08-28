@@ -30,17 +30,36 @@ See [PROJECT_BRIEF.md](PROJECT_BRIEF.md) for full scope and build order.
 
 ## The headline
 
-**23.3% fewer train-hours lost across a 30-day horizon, on 39 sections with
-3 departments, for an identical set of maintenance tasks.** Also 17.9% fewer
-separate blocks, 21 blocks shared across departments against 0 today, and no
-peak-hour blocks against 8.
+**~16% fewer train-hours lost across a 30-day horizon, on 39 sections with 3
+departments, for an identical set of maintenance tasks** — measured over four
+runs at a 60-second solver budget, range 9.5% to 24.5%.
+
+Quote the range, not the best run. A time-limited parallel search returns one
+of several good schedules, and the spread is wide because the solver is still
+improving when the clock stops. The figure also moves with the budget: the
+same instance gives roughly 6% at 30 seconds. Budget and instance size belong
+next to the number every time it is stated. See
+[ASSUMPTIONS.md](ASSUMPTIONS.md) A-19.
+
+Consistent across every run, and far more stable than the percentage:
+
+| | Manual | Ours (same work) |
+|---|---|---|
+| Blocks shared across departments | 0 | 21–37 |
+| Peak-hour blocks | 8 | 0 |
+| Separate blocks | 218 | 155–201 |
+| Tasks finishing late | 135 | 93–115 |
 
 Separately, given the same month the planner completes **54 more tasks** than
 the manual process manages.
 
-Both numbers matter and neither is quoted alone: see
-[ASSUMPTIONS.md](ASSUMPTIONS.md) A-17 for exactly what the baseline is
-allowed to do and why the comparison is normalised.
+Neither column is quoted alone: see [ASSUMPTIONS.md](ASSUMPTIONS.md) A-17 for
+exactly what the baseline is allowed to do and why the comparison is
+normalised to identical work.
+
+**Reducing that variance is the first thing to fix.** The spread comes from
+the solver stopping well short of proving optimality on a 300-task instance;
+better search hints or a tighter formulation would narrow it.
 
 ## Setup
 
@@ -203,5 +222,9 @@ Three, each forced by measurement rather than preference:
   retrained on real history, not by discovering the relationship. Held-out
   AUC is 0.68, which is what learning from noisy events should look like.
   (A-08)
-- **The improvement scales with backlog density** — ~23% at 300 tasks, ~12%
-  at 120 on the same sections. Always quote the instance size.
+- **The improvement scales with backlog density** — sparse work offers fewer
+  chances to merge blocks. Always quote the instance size.
+- **The headline varies run to run** (9.5–24.5% over four runs) because
+  parallel time-limited search is not reproducible, and single-worker or
+  deterministic-time alternatives were measured and are unusable. The data is
+  fully deterministic; the search is not. (A-19)

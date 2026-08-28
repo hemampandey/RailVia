@@ -338,6 +338,37 @@ undone. Measured on the 300-task instance, our plan completed **61 overdue
 tasks where the manual process completed 73** — worse than the baseline at
 the thing the baseline is worst at. With the cap it reaches 73.
 
+## A-19 — The data is reproducible; the search is not
+
+**Status:** measured limitation, not a modelling choice
+
+The brief requires reproducible runs, and the **data** delivers that: same
+seed, byte-identical instance, asserted by
+`tests/test_generator.py::test_generator_is_deterministic`.
+
+The **solver** does not, and could not practically be made to. A time-limited
+parallel CP-SAT search returns one of several good schedules depending on how
+the eight workers interleave. Four runs of the same 300-task instance at a
+30-second budget produced 1,134 to 1,269 train-hours.
+
+Two fixes were measured and rejected:
+
+* `max_deterministic_time` counts work rather than seconds and *is*
+  reproducible, but on this model a budget of 20 units had not returned after
+  eight minutes. Unusable in a demo.
+* A single worker with a fixed seed is reproducible and useless: 30 seconds
+  placed **8 of 300 tasks**, against 271 with eight workers. The parallel
+  portfolio is doing the real work.
+
+So we report the headline as a **range measured over repeated runs**
+(`scripts/compare.py --repeat N`) rather than a single figure that would not
+survive being re-run on stage.
+
+**The figure is also sensitive to the time budget**, which matters more than
+the run-to-run spread: the same instance yields roughly 6% at a 30-second
+budget and roughly 23% at 60 seconds, because the like-for-like plan is still
+improving when the clock stops. Always quote the budget alongside the number.
+
 ---
 
 ## Known weaknesses to state out loud

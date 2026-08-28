@@ -472,9 +472,33 @@ class BlockPlanner:
     # -- solve ---------------------------------------------------------------
 
     def solve(self, log_search: bool = False, workers: int = 8) -> Solution:
+        """Solve within the wall-clock budget.
+
+        On reproducibility, which the brief rightly demands (section 10): the
+        *data* is fully deterministic — same seed, byte-identical instance.
+        The *search* is not, and cannot practically be made so here.
+
+        Two routes were measured and rejected:
+
+          * `max_deterministic_time`, which counts work rather than seconds
+            and is reproducible, runs far longer than its numeric value
+            suggests on this model — a budget of 20 units had not returned
+            after eight minutes, which no demo can use.
+          * A single worker with a fixed seed is reproducible but hopeless:
+            30 seconds placed 8 of 300 tasks, against 271 with eight workers.
+            Parallel search is doing the real work here.
+
+        So the honest position is that a time-limited parallel search returns
+        one of several good schedules, and we report the headline as a
+        measured range across repeated runs rather than a single figure that
+        would not survive being re-run on stage. `scripts/compare.py --repeat`
+        produces that range. The seed below removes one source of variation
+        but does not remove worker interleaving.
+        """
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = self.time_limit
         solver.parameters.num_search_workers = workers
+        solver.parameters.random_seed = 42
         solver.parameters.log_search_progress = log_search
         status = solver.Solve(self.model)
         status_name = solver.StatusName(status)

@@ -28,6 +28,9 @@ def main() -> int:
     ap.add_argument("--percentile", type=float, default=25.0)
     ap.add_argument("--no-ml", action="store_true",
                     help="use flat criticality weights instead of the trained model")
+    ap.add_argument("--repeat", type=int, default=1,
+                    help="repeat the comparison N times and report the range; "
+                         "parallel time-limited search is not bit-reproducible")
     args = ap.parse_args()
 
     source = (
@@ -58,10 +61,19 @@ def main() -> int:
 
     print("\nsolving (baseline, full plan, like-for-like plan)...")
 
-    comparison = run_comparison(
-        instance, time_limit=args.time_limit, percentile=args.percentile,
-        criticality=criticality,
-    )
+    runs = []
+    for attempt in range(max(1, args.repeat)):
+        comparison = run_comparison(
+            instance, time_limit=args.time_limit, percentile=args.percentile,
+            criticality=criticality,
+        )
+        runs.append(comparison)
+        if args.repeat > 1:
+            print(f"  run {attempt + 1}/{args.repeat}: "
+                  f"{comparison.headline_reduction_pct:.1f}% "
+                  f"({comparison.planned_like_for_like.train_hours_lost:.1f} vs "
+                  f"{comparison.baseline.train_hours_lost:.1f} train-hours)")
+    comparison = runs[0]
 
     header = ("Metric", "Manual", "Ours (same work)", "Ours (full backlog)")
     print(f"\n{RULE}")
@@ -81,6 +93,14 @@ def main() -> int:
     if comparison.planned_like_for_like:
         print(f"  {comparison.planned_like_for_like.shared_blocks} blocks shared "
               f"across departments, against 0 today")
+    if len(runs) > 1:
+        values = sorted(r.headline_reduction_pct for r in runs)
+        mean = sum(values) / len(values)
+        print(f"\n  measured over {len(values)} runs: "
+              f"{values[0]:.1f}% to {values[-1]:.1f}%, mean {mean:.1f}%")
+        print("  (parallel time-limited search returns one of several good "
+              "schedules;\n   the data is deterministic, the search is not)")
+
     print("\nSECOND RESULT (full backlog, same 30 days)")
     extra = comparison.planned_full.scheduled_count - comparison.baseline.scheduled_count
     print(f"  {extra} more tasks completed than the manual process manages")
