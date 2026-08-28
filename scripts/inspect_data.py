@@ -16,7 +16,11 @@ from datetime import timedelta
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from src.adapters import JSONFileDataSource, SyntheticDataSource  # noqa: E402
+from src.adapters import (  # noqa: E402
+    GroundedTimetableSource,
+    JSONFileDataSource,
+    SyntheticDataSource,
+)
 from src.models import Department, PlanningInstance  # noqa: E402
 
 BARS = " ▁▂▃▄▅▆▇█"
@@ -131,10 +135,16 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=7)
     ap.add_argument("--sections", type=int, default=5)
     ap.add_argument("--from-file", default=None)
+    ap.add_argument("--grounded", action="store_true",
+                    help="use real timetable-derived sections (data/grounded_sections.json)")
     args = ap.parse_args()
 
     if args.from_file:
         source = JSONFileDataSource(args.from_file)
+    elif args.grounded:
+        source = GroundedTimetableSource(
+            seed=args.seed, n_tasks=args.tasks, horizon_days=args.days
+        )
     else:
         source = SyntheticDataSource(
             seed=args.seed, n_tasks=args.tasks,
@@ -148,6 +158,10 @@ def main() -> int:
     print(f"  horizon: {inst.horizon_start} .. {inst.horizon_end - timedelta(days=1)} "
           f"({inst.horizon_days} days)")
     print(RULE)
+    print("\n  PROVENANCE BY COMPONENT")
+    for name, kind in inst.sources.components.items():
+        mark = "generated" if kind.value == "synthetic" else "REAL"
+        print(f"    {name:15} {kind.value:18} {mark}")
     print(f"\n  !! {inst.provenance}")
 
     show_sections(inst)

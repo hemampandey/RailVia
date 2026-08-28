@@ -46,12 +46,16 @@ def test_downstream_never_imports_the_generator():
     )
 
 
-def test_only_the_synthetic_adapter_knows_the_generator():
-    """Exactly one file downstream of the boundary may name the generator."""
+def test_only_the_adapter_layer_knows_the_generator():
+    """Knowledge of the generator is confined to the adapter layer.
+
+    These are the composition roots: they are allowed to assemble generated
+    data. Everything downstream sees only DataSource.
+    """
     knowers = sorted(
         p.name for p in (SRC / "adapters").rglob("*.py") if _imports_generator(p)
     )
-    assert knowers == ["synthetic.py"]
+    assert knowers == ["hybrid.py", "synthetic.py"]
 
 
 def test_synthetic_source_satisfies_the_interface():

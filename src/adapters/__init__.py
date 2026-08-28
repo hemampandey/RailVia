@@ -7,11 +7,13 @@ from src.adapters.base import (
     TDMSAdapter,
     TMSAdapter,
 )
+from src.adapters.hybrid import GroundedTimetableSource
 from src.adapters.synthetic import JSONFileDataSource, SyntheticDataSource
 
 __all__ = [
     "COAAdapter",
     "DataSource",
+    "GroundedTimetableSource",
     "JSONFileDataSource",
     "NotYetIntegrated",
     "REAL_FEED_ADAPTERS",

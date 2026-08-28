@@ -67,6 +67,8 @@ class JSONFileDataSource(DataSource):
     def load(self) -> PlanningInstance:
         with open(self.path) as fh:
             instance = PlanningInstance.model_validate_json(fh.read())
+        # is_synthetic is computed from the instance's own provenance record,
+        # so a replayed file cannot misreport what it contains.
         self.is_synthetic = instance.is_synthetic
         instance.validate_referential_integrity()
         return instance

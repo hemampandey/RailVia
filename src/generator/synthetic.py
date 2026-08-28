@@ -16,10 +16,12 @@ from src.generator.catalogue import CATALOGUE, ActivitySpec
 from src.generator.sections import archetype_of, build_sections
 from src.models import (
     CrewCapacity,
+    DataProvenance,
     Department,
     PlanningInstance,
     Section,
     Severity,
+    SourceKind,
     Task,
     TrafficWindow,
 )
@@ -128,7 +130,13 @@ def _build_traffic(
     """
     windows: list[TrafficWindow] = []
     for section in sections:
-        archetype = archetype_of(section.id)
+        try:
+            archetype = archetype_of(section.id)
+        except KeyError:
+            # A real, timetable-derived section. We have no freight data for
+            # it: public passenger timetables do not carry goods paths, and
+            # guessing them would be inventing traffic. Leave unflagged.
+            archetype = None
         for day_offset in range(horizon_days):
             day = horizon_start + timedelta(days=day_offset)
             dow = day.weekday()
@@ -168,6 +176,40 @@ def _build_crew_capacity(
     return capacity
 
 
+def generate_tasks(
+    rng: random.Random,
+    sections: list[Section],
+    n_tasks: int,
+    horizon_start: date,
+    horizon_days: int,
+) -> list[Task]:
+    """Generate a synthetic maintenance backlog against any section list.
+
+    Split out from generate_instance so the same backlog logic can be laid
+    over real, timetable-derived sections. See src/adapters/hybrid.py.
+    """
+    tasks: list[Task] = []
+    for idx in range(1, n_tasks + 1):
+        section = rng.choice(sections)
+        spec = rng.choice(CATALOGUE)
+        tasks.append(_make_task(rng, idx, section, spec, horizon_start, horizon_days))
+    return tasks
+
+
+def build_traffic(
+    sections: list[Section], horizon_start: date, horizon_days: int
+) -> list[TrafficWindow]:
+    """Public wrapper: expand section profiles into per-day traffic windows."""
+    return _build_traffic(sections, horizon_start, horizon_days)
+
+
+def build_crew_capacity(
+    rng: random.Random, horizon_start: date, horizon_days: int
+) -> list[CrewCapacity]:
+    """Public wrapper for crew capacity generation."""
+    return _build_crew_capacity(rng, horizon_start, horizon_days)
+
+
 def generate_instance(
     seed: int = 42,
     n_tasks: int = 20,
@@ -182,19 +224,19 @@ def generate_instance(
     if n_sections is not None:
         sections = sections[:n_sections]
 
-    tasks: list[Task] = []
-    for idx in range(1, n_tasks + 1):
-        section = rng.choice(sections)
-        spec = rng.choice(CATALOGUE)
-        tasks.append(
-            _make_task(rng, idx, section, spec, horizon_start, horizon_days)
-        )
+    tasks = generate_tasks(rng, sections, n_tasks, horizon_start, horizon_days)
 
     instance = PlanningInstance(
         instance_id=f"phase0-s{seed}-{n_sections}sec-{n_tasks}task-{horizon_days}d",
         generated_at=datetime(2026, 1, 1, 0, 0, 0),  # fixed: keeps output byte-stable
         seed=seed,
-        is_synthetic=True,
+        sources=DataProvenance(
+            sections=SourceKind.SYNTHETIC,
+            tasks=SourceKind.SYNTHETIC,
+            traffic=SourceKind.SYNTHETIC,
+            crew_capacity=SourceKind.SYNTHETIC,
+            notes="Fully synthetic Phase 0 instance; no external data used.",
+        ),
         provenance=PROVENANCE,
         horizon_start=horizon_start,
         horizon_days=horizon_days,
