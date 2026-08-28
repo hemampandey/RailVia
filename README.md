@@ -52,18 +52,25 @@ Inspect it in human-readable form — this is the Phase 0 gate:
 ### Real timetable data
 
 Get a free sandbox key (1,000 requests/month) at
-<https://railradar.in/developers>, then confirm the response shape with one
-request:
+<https://railradar.in/developers>, then put it in a `.env` file in the repo
+root — `.env` is gitignored, so the key is never committed:
 
 ```bash
-RAILRADAR_API_KEY=rr_live_xxx .venv/bin/python scripts/probe_api.py --station NDLS
+cp .env.example .env
+```
+
+Edit `.env` and replace the placeholder with your key. Then confirm the
+response shape with one request:
+
+```bash
+.venv/bin/python scripts/probe_api.py --station NDLS
 ```
 
 Then build real section profiles. Deriving the corridor from a train's route
 guarantees the station pairs are physically adjacent:
 
 ```bash
-RAILRADAR_API_KEY=rr_live_xxx .venv/bin/python scripts/fetch_timetable.py --from-train 12002 --start NDLS --end GZB
+.venv/bin/python scripts/fetch_timetable.py --from-train 12002 --start NDLS --end GZB
 ```
 
 Cost is 1 request for the route plus 1 per station. Responses are cached to

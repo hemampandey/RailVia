@@ -4,3 +4,8 @@ __pycache__/
 .pytest_cache/
 data/*.json
 .DS_Store
+
+# Secrets — never commit
+.env
+.env.local
+*.key

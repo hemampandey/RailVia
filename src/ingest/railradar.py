@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 BASE_URL = "https://api.railradar.in/v1"
+ENV_VAR = "RAILRADAR_API_KEY"
 DEFAULT_CACHE_DIR = pathlib.Path("data/cache/railradar")
 USER_AGENT = "SIH26027-block-planner/0.1 (academic project; contact via repo)"
 
@@ -38,6 +39,48 @@ FREE_TIER_MONTHLY_REQUESTS = 1000
 DEFAULT_RUN_BUDGET = 60
 
 
+def load_dotenv(path: pathlib.Path | str = ".env") -> dict[str, str]:
+    """Minimal .env reader — no dependency, no surprises.
+
+    Values already in the real environment win, so an inline
+    `RAILRADAR_API_KEY=... command` still overrides the file.
+    """
+    path = pathlib.Path(path)
+    loaded: dict[str, str] = {}
+    if not path.exists():
+        return loaded
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("\"'")
+        if key and value:
+            loaded[key] = value
+            os.environ.setdefault(key, value)
+    return loaded
+
+
+def find_api_key(explicit: str | None = None) -> str | None:
+    """Resolve the key: explicit argument, then environment, then .env."""
+    if explicit:
+        return explicit
+    if os.environ.get(ENV_VAR):
+        return os.environ[ENV_VAR]
+    # Walk up from the working directory so scripts work from subdirectories.
+    here = pathlib.Path.cwd()
+    for directory in (here, *here.parents):
+        candidate = directory / ".env"
+        if candidate.exists():
+            load_dotenv(candidate)
+            if os.environ.get(ENV_VAR):
+                return os.environ[ENV_VAR]
+        if (directory / ".git").exists():
+            break
+    return None
+
+
 class RailRadarError(RuntimeError):
     """Any failure talking to RailRadar."""
 
@@ -45,9 +88,12 @@ class RailRadarError(RuntimeError):
 class MissingAPIKey(RailRadarError):
     def __init__(self) -> None:
         super().__init__(
-            "No RailRadar API key. Set RAILRADAR_API_KEY in the environment, "
-            "or pass api_key=. Free sandbox keys (1,000 requests/month) are "
-            "issued at https://railradar.in/developers"
+            "No RailRadar API key found.\n"
+            "  Add it to a .env file in the repo root (gitignored):\n"
+            "      echo 'RAILRADAR_API_KEY=rr_live_...' >> .env\n"
+            "  or pass it inline:\n"
+            "      RAILRADAR_API_KEY=rr_live_... .venv/bin/python scripts/probe_api.py --station NDLS\n"
+            "  Free sandbox keys (1,000 requests/month): https://railradar.in/developers"
         )
 
 
@@ -116,7 +162,7 @@ class RailRadarClient:
         offline: bool = False,
         timeout: float = 30.0,
     ) -> None:
-        self.api_key = api_key or os.environ.get("RAILRADAR_API_KEY")
+        self.api_key = find_api_key(api_key)
         self.cache_dir = pathlib.Path(cache_dir)
         self.offline = offline
         self.timeout = timeout
