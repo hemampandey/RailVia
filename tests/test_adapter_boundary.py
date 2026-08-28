@@ -55,7 +55,7 @@ def test_only_the_adapter_layer_knows_the_generator():
     knowers = sorted(
         p.name for p in (SRC / "adapters").rglob("*.py") if _imports_generator(p)
     )
-    assert knowers == ["hybrid.py", "synthetic.py"]
+    assert knowers == ["history.py", "hybrid.py", "synthetic.py"]
 
 
 def test_synthetic_source_satisfies_the_interface():

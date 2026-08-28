@@ -1,11 +1,15 @@
-# Phase 0-1
+# Core
 pydantic>=2.0
 pytest>=8.0
 ortools>=9.10          # CP-SAT solver, Apache-2.0
-# Phase 2-3 (not yet imported)
-# pandas>=2.0
-# lightgbm>=4.0
-# shap>=0.45
-# Phase 4
-# fastapi>=0.110
-# uvicorn>=0.29
+
+# Criticality scoring (Phase 3)
+lightgbm>=4.0
+scikit-learn>=1.4
+numpy>=1.26
+pandas>=2.0
+
+# API + UI (Phase 4). The front end has no JS dependencies at all:
+# plain JS and hand-drawn SVG, so a demo cannot fail on a slow CDN.
+fastapi>=0.110
+uvicorn>=0.29

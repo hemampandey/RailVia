@@ -9,3 +9,4 @@ data/*.json
 .env
 .env.local
 *.key
+demo_run.txt

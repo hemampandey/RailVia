@@ -202,6 +202,9 @@ class BlockPlanner:
         self.assign: dict[tuple[str, int], cp_model.IntVar] = {}
         self.block_vars: dict[str, dict[int, dict]] = {}
         self.late_days_var: dict[str, cp_model.IntVar] = {}
+        # Upper bound per task, tracked here because IntVar.Proto() segfaults
+        # in this OR-Tools build rather than returning the domain.
+        self.late_ceiling: dict[str, int] = {}
         self.impossible: list[str] = []
 
         grouped = self._tasks_by_section()
@@ -395,6 +398,7 @@ class BlockPlanner:
             model.AddDivisionEquality(end_day, self.task_end[task.id], grid.slots_per_day)
             ceiling = max(0, horizon_days - due_day) + 1
             late = model.NewIntVar(0, ceiling, f"late_{task.id}")
+            self.late_ceiling[task.id] = ceiling
             present = self.task_present[task.id]
             model.Add(late >= end_day - due_day).OnlyEnforceIf(present)
             model.Add(late == 0).OnlyEnforceIf(present.Not())
@@ -442,10 +446,26 @@ class BlockPlanner:
             penalty = int(self.unscheduled_penalty * (0.2 + 0.8 * weight))
             terms.append(penalty * (1 - present))
 
+        # Lateness is capped so that doing the work late can never cost more
+        # than not doing it at all.
+        #
+        # Without the cap the model prefers to abandon exactly the work that
+        # matters most: a task already 45 days overdue, finished on day 20 of
+        # a 30-day horizon, accrues 65 days of lateness. At 2,000 per day that
+        # is 130,000 against a 100,000 penalty for leaving it undone, so the
+        # optimiser drops it. Measured on the 300-task instance, this made our
+        # plan complete 61 overdue tasks where the *manual* process completed
+        # 73 — worse than the baseline at the thing the baseline is worst at.
         for task_id, late in self.late_days_var.items():
             weight = max(0.0, min(1.0, self.criticality.get(task_id, 1.0)))
-            cost = int(self.late_penalty_per_day * (0.2 + 0.8 * weight))
-            terms.append(cost * late)
+            rate = int(self.late_penalty_per_day * (0.2 + 0.8 * weight))
+            drop_cost = int(self.unscheduled_penalty * (0.2 + 0.8 * weight))
+            ceiling = self.late_ceiling.get(task_id, 0)
+            raw = self.model.NewIntVar(0, rate * ceiling + 1, f"lateraw_{task_id}")
+            self.model.Add(raw == rate * late)
+            capped = self.model.NewIntVar(0, max(0, drop_cost - 1), f"latecap_{task_id}")
+            self.model.AddMinEquality(capped, [raw, max(0, drop_cost - 1)])
+            terms.append(capped)
 
         self.model.Minimize(sum(terms))
 

@@ -287,6 +287,57 @@ ignore. Deferred so that Phase 1 reports only what the brief specifies.
 Pinned by `tests/test_optimiser_constraints.py::
 test_no_colocation_incentive_when_blocking_is_free`.
 
+## A-16 — Department mix
+
+**Status:** `CONSTRUCT`
+
+Tasks are drawn by sampling a department first (ENGG 45%, TRD 25%, S&T 30%),
+then an activity within it. Sampling activities from the flat catalogue
+instead skewed the mix toward whichever department listed most activity
+types, leaving TRD at 10% of tasks — indefensible in a project about
+three-department coordination. The weights reflect that permanent-way work
+dominates maintenance volume; they are a judgement, not a measurement.
+
+## A-17 — What the manual baseline is allowed to do
+
+**Status:** `CONSTRUCT` — *the most attackable number in the project.*
+
+The baseline decides the headline, so it is modelled to be beatable only in
+the ways the problem statement actually names:
+
+* Each department schedules its own work, most overdue first, and **never
+  merges a block with another department**. This is the coordination failure.
+* Blocks go in a conventional 01:00–05:00 night window, applied uniformly to
+  every section. This is the "not optimised against the timetable" failure —
+  a sensible rule of thumb that cannot know one section is quiet at 02:00 and
+  another at 14:00.
+
+Deliberately granted to the baseline, so it is not a strawman:
+
+* The night window itself. It is never made to block at 09:00.
+* Physical safety: two blocks never overlap on one section, whoever asked.
+* Its own crew limits, respected per department per day.
+* Urgency ordering.
+
+**The comparison is also normalised.** The night window means the manual
+process physically fits less work — 218 of 300 tasks against our 272 — so
+raw train-hour totals would show it "winning" by doing less. The headline
+therefore re-plans **exactly the task set the baseline managed**, identical
+crews and horizon. Both columns are published; quoting either alone would
+mislead in one direction or the other.
+
+## A-18 — Lateness is capped below the cost of abandonment
+
+**Status:** correctness requirement, found by measurement
+
+Doing work late must never cost more than not doing it at all. Without the
+cap the model abandoned exactly the work that matters most: a task 45 days
+overdue and finished on day 20 of a 30-day horizon accrues 65 days of
+lateness, which at 2,000 per day exceeds the 100,000 penalty for leaving it
+undone. Measured on the 300-task instance, our plan completed **61 overdue
+tasks where the manual process completed 73** — worse than the baseline at
+the thing the baseline is worst at. With the cap it reaches 73.
+
 ---
 
 ## Known weaknesses to state out loud

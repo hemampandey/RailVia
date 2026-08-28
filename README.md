@@ -16,17 +16,31 @@ See [PROJECT_BRIEF.md](PROJECT_BRIEF.md) for full scope and build order.
 > `is_synthetic=True` if *any* component is generated.
 > See [ASSUMPTIONS.md](ASSUMPTIONS.md).
 
-## Status: Phase 0 complete
+## Status: all phases complete
 
 | Phase | Scope | State |
 |-------|-------|-------|
 | 0 | Data model + tiny generator (5 sections, 20 tasks, 7 days) | done |
-| 0.5 | Real timetable ingestion — pipeline built, awaiting API key | ready to run |
+| 0.5 | Real timetable ingestion (RailRadar) | done |
 | 1 | Minimum viable CP-SAT optimiser | done |
-| 2 | IRPWM-grounded data at scale, crew + deadline constraints | next |
-| 3 | Criticality model + baseline simulator | |
-| 4 | FastAPI + React Gantt UI | |
-| 5 | Polish, re-planning, recorded demo | |
+| 2 | Real scale (39 sections, 300 tasks), crew + deadline constraints | done |
+| 3 | Criticality model + baseline simulator | done |
+| 4 | FastAPI + browser UI | done |
+| 5 | Scenario re-planning, recorded demo | done |
+
+## The headline
+
+**23.3% fewer train-hours lost across a 30-day horizon, on 39 sections with
+3 departments, for an identical set of maintenance tasks.** Also 17.9% fewer
+separate blocks, 21 blocks shared across departments against 0 today, and no
+peak-hour blocks against 8.
+
+Separately, given the same month the planner completes **54 more tasks** than
+the manual process manages.
+
+Both numbers matter and neither is quoted alone: see
+[ASSUMPTIONS.md](ASSUMPTIONS.md) A-17 for exactly what the baseline is
+allowed to do and why the comparison is normalised.
 
 ## Setup
 
@@ -91,6 +105,34 @@ Prints the permitted windows per section, the block plan as a text table, and
 the train-hours lost. `--percentile` controls how much of each section's day
 is open to planned work (default: quietest 25%).
 
+### Before / after — the headline number
+
+```bash
+.venv/bin/python scripts/compare.py --grounded --tasks 300 --days 30
+```
+
+### Browser UI
+
+```bash
+.venv/bin/uvicorn src.api.app:app --port 8077
+```
+
+Then open <http://localhost:8077>. Four views: block plan (Gantt, coloured by
+department, shared blocks highlighted), before/after, criticality with
+per-task explanations, and section traffic profiles. No build step and no CDN
+— the page is plain JS and hand-drawn SVG, so the demo cannot fail because of
+a network. That is a deliberate departure from the brief's "React + Gantt
+library"; the trade-off is discussed below.
+
+### Recorded demo (stage backup)
+
+```bash
+.venv/bin/python scripts/demo.py --out demo_run.txt
+```
+
+Runs every stage and writes a transcript. Deterministic given the seed, so
+the recording and a live run produce identical numbers.
+
 Run the tests:
 
 ```bash
@@ -106,11 +148,11 @@ src/generator/    Synthetic instance generator (a deliverable, not a shortcut)
 src/adapters/     THE BOUNDARY: DataSource interface, synthetic source,
                   hybrid (real traffic + synthetic tasks), and typed stubs
                   for the four real systems
-src/optimiser/    CP-SAT model: windows.py (time grid, permitted
-                  windows), model.py (the solver model)
-src/ml/           Criticality scoring             (Phase 3)
-src/baseline/     Manual-process simulator        (Phase 3)
-src/api/          FastAPI                         (Phase 4)
+src/optimiser/    CP-SAT model: windows.py (time grid, permitted windows),
+                  model.py (solver model), replan.py (disruption re-planning)
+src/ml/           Criticality scoring (LightGBM) + explainability
+src/baseline/     Manual-process simulator and the before/after comparison
+src/api/          FastAPI backend + dependency-free browser UI
 scripts/          CLI entry points
 tests/            pytest — constraint tests mandatory from Phase 1
 ```
@@ -125,3 +167,41 @@ implementation that returns data today; `TMSAdapter`, `SMMSAdapter`,
 `tests/test_adapter_boundary.py` fails the build if anything downstream
 imports the generator directly, so "real feeds plug in here" stays true rather
 than becoming a slide claim.
+
+
+## Departures from the brief, and why
+
+Three, each forced by measurement rather than preference:
+
+1. **The peak-hour rule is per-section, not a flat `trains_per_hour > 8`.**
+   Real traffic kills the flat rule: Sahibabad–Ghaziabad never drops below
+   2.9 trains/hour and offers no contiguous sub-8 window longer than 2 hours,
+   so every task over 120 minutes there would have been infeasible. Each
+   section's quietest 25% of hours is now the permitted set. (A-14)
+
+2. **NoOverlap applies to blocks, not tasks.** Applied to tasks it would
+   forbid two departments working one section at once — precisely the
+   coordination the project exists to demonstrate. Tasks nest inside blocks;
+   blocks are what cannot overlap.
+
+3. **The UI is plain JS and SVG rather than React.** The brief says "keep it
+   simple", and a demo that cannot be broken by a slow CDN or hostile venue
+   wifi was worth more than the framework. Everything asked for is there:
+   department colour-coding, shared-block highlighting, weekly/monthly
+   toggle, KPI dashboard, before/after view.
+
+## Honest limitations
+
+- **Maintenance periodicities are still provisional.** No IRPWM clause
+  numbers are cited because none have been read. Fabricating them would be
+  the worst thing we could do to our own credibility. (A-01)
+- **Freight is invisible.** Goods paths are absent from public timetables, so
+  night traffic on real sections is undercounted — the one axis where our
+  figures could flatter us. (A-04)
+- **The failure hazard the ML model learns is one we wrote.** The model earns
+  its place by combining features into an explainable ranking that can be
+  retrained on real history, not by discovering the relationship. Held-out
+  AUC is 0.68, which is what learning from noisy events should look like.
+  (A-08)
+- **The improvement scales with backlog density** — ~23% at 300 tasks, ~12%
+  at 120 on the same sections. Always quote the instance size.
