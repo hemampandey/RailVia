@@ -1,0 +1,11 @@
+# Phase 0-1
+pydantic>=2.0
+pytest>=8.0
+ortools>=9.10          # CP-SAT solver, Apache-2.0
+# Phase 2-3 (not yet imported)
+# pandas>=2.0
+# lightgbm>=4.0
+# shap>=0.45
+# Phase 4
+# fastapi>=0.110
+# uvicorn>=0.29
