@@ -1,8 +1,14 @@
 # Render blueprint. One service: the API, serving the UI it was built with.
 #
+# Lives at the repository root because that is where Render looks for it.
+#
 #   1. Push this repo to GitHub
-#   2. Render → New → Blueprint → point it at this file
+#   2. Render → New → Blueprint → pick this repository → Apply
 #   3. Fill in the four environment variables below
+#
+# This creates the service with the Docker runtime already set. A service's
+# runtime cannot be changed after creation, which is why an existing Python
+# service has to be replaced rather than converted.
 #
 # The two NEXT_PUBLIC_* values are baked into the UI at build time, so
 # changing them needs a redeploy, not just a restart. They are safe to expose:

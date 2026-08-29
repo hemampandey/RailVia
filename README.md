@@ -245,8 +245,11 @@ long-running optimiser; serverless is the wrong shape for it, and no
 `entrypoint` configuration changes that.
 
 1. Push to GitHub
-2. Render → **New** → **Blueprint** → point at
-   [`deploy/render.yaml`](deploy/render.yaml)
+2. Render → **New** → **Blueprint** → pick this repository → **Apply**
+
+   A service's runtime cannot be changed after it is created, so a service
+   made with the Python runtime has to be deleted and replaced rather than
+   converted. The blueprint creates it with Docker already set.
 3. Fill in four environment variables:
 
 | Variable | Notes |
