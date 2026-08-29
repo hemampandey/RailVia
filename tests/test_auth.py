@@ -30,7 +30,15 @@ def make_token(**over) -> str:
 
 @pytest.fixture(autouse=True)
 def secret(monkeypatch):
+    """Legacy HS256 path. SUPABASE_URL is cleared so the asymmetric path is
+    skipped and these tests exercise the shared-secret fallback."""
+    from src.store import auth
+
     monkeypatch.setenv("SUPABASE_JWT_SECRET", SECRET)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    auth.reset()
+    yield
+    auth.reset()
 
 
 @pytest.mark.parametrize(
@@ -83,7 +91,42 @@ def test_unsigned_token_is_refused():
         verify(unsigned)
 
 
-def test_missing_secret_is_reported_clearly(monkeypatch):
+def test_no_way_to_verify_is_reported_clearly(monkeypatch):
+    """Neither a JWKS endpoint nor a shared secret: say so, do not guess."""
     monkeypatch.delenv("SUPABASE_JWT_SECRET", raising=False)
-    with pytest.raises(AuthError, match="JWT Secret"):
+    with pytest.raises(AuthError, match="cannot verify"):
         verify(make_token())
+
+
+def test_asymmetric_projects_need_no_shared_secret(monkeypatch):
+    """Current Supabase projects sign with ES256 and expose public keys, so
+    verification must work with SUPABASE_JWT_SECRET absent entirely.
+
+    Regression: the verifier originally hardcoded algorithms=["HS256"] and
+    rejected every real token with "The specified alg value is not allowed".
+    """
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    from src.store import auth
+
+    monkeypatch.delenv("SUPABASE_JWT_SECRET", raising=False)
+    key = ec.generate_private_key(ec.SECP256R1())
+    token = jwt.encode(
+        {"sub": "u1", "email": "e@x.com", "aud": "authenticated",
+         "exp": int(time.time()) + 60},
+        key, algorithm="ES256",
+    )
+
+    class FakeSigningKey:
+        def __init__(self, k):
+            self.key = k
+
+    monkeypatch.setattr(
+        auth, "_client",
+        lambda: type("C", (), {
+            "get_signing_key_from_jwt": lambda self, t: FakeSigningKey(key.public_key())
+        })(),
+    )
+    caller = verify(token)
+    assert caller.user_id == "u1"
+    assert caller.email == "e@x.com"

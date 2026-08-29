@@ -4,13 +4,26 @@ The UI hides the Approve button from engineers, but that is a courtesy, not a
 control — anyone can call the API directly. Authorisation is therefore
 enforced in two places that both have to agree:
 
-  1. Here, so the API knows who is calling and can reject an unsigned or
-     expired token before doing any work.
+  1. Here, so the API knows who is calling and can reject an unsigned,
+     expired or forged token before doing any work.
   2. In Postgres, by the row-level-security policies in schema.sql, which is
      what actually stops an engineer inserting an approval.
 
-The second is the real control. This layer exists so the API can attribute a
-decision to a named user and fail early with a clear message.
+The second is the real control. This layer exists so a decision can be
+attributed to a named user and a bad token fails early.
+
+Two signing schemes
+-------------------
+Supabase projects come in two flavours and this handles both:
+
+  * **Asymmetric (ES256/RS256)** — current default. Tokens are verified
+    against the project's PUBLIC keys, fetched from its JWKS endpoint. No
+    shared secret exists, and none is needed: there is nothing to leak.
+  * **HS256 with a shared secret** — legacy. Verified with
+    SUPABASE_JWT_SECRET.
+
+Asymmetric is tried first and the secret is only a fallback, so a project
+that has moved on needs no configuration beyond its URL.
 """
 
 from __future__ import annotations
@@ -19,8 +32,14 @@ import os
 from dataclasses import dataclass
 
 import jwt
+from jwt import PyJWKClient
 
 JWT_SECRET_VAR = "SUPABASE_JWT_SECRET"
+URL_VAR = "SUPABASE_URL"
+
+ASYMMETRIC_ALGS = ["ES256", "RS256"]
+
+_jwks_client: PyJWKClient | None = None
 
 
 class AuthError(Exception):
@@ -40,21 +59,66 @@ class Caller:
         return self.email or self.user_id
 
 
+def jwks_url() -> str | None:
+    base = os.environ.get(URL_VAR)
+    return f"{base.rstrip('/')}/auth/v1/.well-known/jwks.json" if base else None
+
+
+def _client() -> PyJWKClient | None:
+    """Cached JWKS client. Caches keys and refetches on an unknown kid, so
+    key rotation does not need a restart."""
+    global _jwks_client
+    if _jwks_client is None:
+        url = jwks_url()
+        if not url:
+            return None
+        _jwks_client = PyJWKClient(url, cache_keys=True, lifespan=600)
+    return _jwks_client
+
+
+def reset() -> None:
+    """Testing hook: drop the cached JWKS client."""
+    global _jwks_client
+    _jwks_client = None
+
+
+def _decode_asymmetric(token: str) -> dict | None:
+    """Verify against the project's public keys. None if unavailable."""
+    client = _client()
+    if client is None:
+        return None
+    try:
+        key = client.get_signing_key_from_jwt(token).key
+    except Exception:  # noqa: BLE001 - no JWKS, offline, or no matching kid
+        return None
+    return jwt.decode(
+        token, key, algorithms=ASYMMETRIC_ALGS, audience="authenticated",
+    )
+
+
+def _decode_hs256(token: str) -> dict:
+    secret = os.environ.get(JWT_SECRET_VAR)
+    if not secret:
+        raise AuthError(
+            "cannot verify this session. The project signs tokens with an "
+            "asymmetric key, so SUPABASE_URL must be set and its JWKS "
+            "endpoint reachable; for a legacy project, set "
+            f"{JWT_SECRET_VAR} instead."
+        )
+    return jwt.decode(
+        token, secret, algorithms=["HS256"], audience="authenticated",
+    )
+
+
 def verify(token: str | None) -> Caller:
     """Decode and verify a Supabase access token."""
     if not token:
         raise AuthError("sign in to record a decision")
 
-    secret = os.environ.get(JWT_SECRET_VAR)
-    if not secret:
-        raise AuthError(
-            f"{JWT_SECRET_VAR} is not set — the API cannot verify sign-ins. "
-            "Copy it from Supabase → Project Settings → API → JWT Secret."
-        )
     try:
-        claims = jwt.decode(
-            token, secret, algorithms=["HS256"], audience="authenticated",
-        )
+        claims = _decode_asymmetric(token)
+        if claims is None:
+            claims = _decode_hs256(token)
     except jwt.ExpiredSignatureError as exc:
         raise AuthError("session expired — sign in again") from exc
     except jwt.InvalidTokenError as exc:

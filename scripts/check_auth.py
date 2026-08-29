@@ -20,7 +20,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from src.ingest.railradar import load_dotenv  # noqa: E402
-from src.store.auth import JWT_SECRET_VAR  # noqa: E402
+from src.store.auth import JWT_SECRET_VAR, jwks_url  # noqa: E402
 
 OK, BAD, WARN = "  OK  ", " FAIL ", " WARN "
 
@@ -38,13 +38,35 @@ def main() -> int:
         print(f"[{BAD}] Supabase unreachable: {exc}")
         return 1
 
-    if os.environ.get(JWT_SECRET_VAR):
-        print(f"[{OK}] {JWT_SECRET_VAR} is set — sign-ins can be verified")
-    else:
-        problems += 1
-        print(f"[{BAD}] {JWT_SECRET_VAR} is NOT set")
-        print("        Supabase → Project Settings → API → JWT Secret,")
-        print("        then add it to .env and restart the API.")
+    # Current Supabase projects sign with asymmetric keys and need no shared
+    # secret at all; only legacy projects use SUPABASE_JWT_SECRET.
+    import json
+    import urllib.request
+
+    verified = False
+    url = jwks_url()
+    if url:
+        try:
+            with urllib.request.urlopen(url, timeout=10) as r:
+                keys = json.loads(r.read()).get("keys", [])
+            if keys:
+                algs = ", ".join(sorted({k.get("alg", "?") for k in keys}))
+                print(f"[{OK}] sign-ins verified against the project's public "
+                      f"keys ({algs})")
+                print("        No shared secret needed — SUPABASE_JWT_SECRET "
+                      "is ignored.")
+                verified = True
+        except Exception as exc:  # noqa: BLE001
+            print(f"[{WARN}] could not reach the JWKS endpoint: {exc}")
+
+    if not verified:
+        if os.environ.get(JWT_SECRET_VAR):
+            print(f"[{OK}] {JWT_SECRET_VAR} is set — legacy HS256 verification")
+        else:
+            problems += 1
+            print(f"[{BAD}] no way to verify sign-ins")
+            print("        Check SUPABASE_URL is correct, or set "
+                  f"{JWT_SECRET_VAR} for a legacy project.")
 
     # IMPORTANT: this reads with the anon key, and the "read own profile"
     # policy restricts rows to auth.uid() = id. Anonymously that matches
