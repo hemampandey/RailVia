@@ -90,10 +90,21 @@ def test_comparison_contract():
     assert isinstance(body["headline_reduction_pct"], float)
 
 
-def test_service_is_a_pure_api():
-    """The UI is a separate Next.js app; this service serves JSON only."""
-    assert client.get("/").status_code == 404
+def test_root_serves_the_ui_when_built_and_404s_otherwise():
+    """This service serves the API always, and the UI once it is built.
+
+    It used to be JSON-only, with the UI deployed separately. Serving both
+    from one process is what makes the deployment a single Render service.
+    """
+    from src.api.app import UI_DIR
+
     assert client.get("/api/health").json() == {"status": "ok"}
+    root = client.get("/")
+    if UI_DIR.is_dir():
+        assert root.status_code == 200
+        assert "RailVia" in root.text
+    else:
+        assert root.status_code == 404
 
 
 def test_cors_allows_the_next_dev_origin():
