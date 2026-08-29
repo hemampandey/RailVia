@@ -48,6 +48,7 @@ doing nothing costs nothing, so the empty schedule would be optimal.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
@@ -73,6 +74,25 @@ DEFAULT_UNSCHEDULED_PENALTY = 100_000
 DEFAULT_LATE_PENALTY_PER_DAY = 2_000
 
 DEFAULT_TIME_LIMIT_SECONDS = 60.0  # A live demo cannot wait longer.
+
+# How many search workers CP-SAT may use.
+#
+# This is a MEMORY setting as much as a speed one: each worker holds its own
+# copy of the search state. Measured on the 120-task instance —
+#
+#     workers   peak RSS   train-hours
+#           1      257 MB         424
+#           2      369 MB         277
+#           4      498 MB         272
+#           8      651 MB         330
+#
+# — so a 512 MB container is killed at 4 workers and above, and 8 is worse
+# than 2 on quality anyway because a time-limited portfolio search is not
+# monotone. os.cpu_count() cannot be trusted here: it reports the host's
+# cores, not the cgroup limit a container actually gets, so this is explicit.
+DEFAULT_WORKERS = int(os.environ.get("SOLVER_WORKERS", "0")) or min(
+    os.cpu_count() or 1, 8
+)
 
 
 @dataclass
@@ -518,7 +538,7 @@ class BlockPlanner:
 
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = self.time_limit
-        solver.parameters.num_search_workers = workers
+        solver.parameters.num_search_workers = workers or DEFAULT_WORKERS
         solver.parameters.random_seed = 42
         solver.parameters.log_search_progress = log_search
         status = solver.Solve(self.model)

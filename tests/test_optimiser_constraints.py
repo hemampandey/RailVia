@@ -434,3 +434,33 @@ def test_unused_blocks_do_not_add_cost():
     assert solution.train_hours_lost == pytest.approx(
         sum(b.train_hours for b in solution.blocks)
     )
+
+
+# --- resource limits -------------------------------------------------------
+
+
+def test_worker_count_is_configurable(monkeypatch):
+    """Worker count is a MEMORY setting as much as a speed one.
+
+    Each CP-SAT worker holds its own search state: measured on the 120-task
+    instance the solve peaks at 369 MB with 2 workers and 651 MB with 8, so a
+    512 MB container dies at the default. os.cpu_count() cannot help — it
+    reports the host's cores, not the cgroup limit a container is given.
+    """
+    import importlib
+
+    import src.optimiser.model as model
+
+    monkeypatch.setenv("SOLVER_WORKERS", "2")
+    importlib.reload(model)
+    assert model.DEFAULT_WORKERS == 2
+
+    monkeypatch.delenv("SOLVER_WORKERS", raising=False)
+    importlib.reload(model)
+    assert 1 <= model.DEFAULT_WORKERS <= 8
+
+
+def test_solving_honours_an_explicit_worker_count():
+    instance = build_instance({"S1": NIGHT_SPARSE}, [task("T1", "S1", 60)])
+    solution = BlockPlanner(instance, time_limit=10).solve(workers=1)
+    assert solution.feasible

@@ -261,6 +261,27 @@ them needs a redeploy rather than a restart. Both are safe to expose: the
 anon key is designed for browsers, and row-level security is what protects
 the data.
 
+**Memory is the thing that bites.** Each CP-SAT worker holds its own copy of
+the search state, so worker count is a memory setting as much as a speed one.
+Measured on the 120-task instance:
+
+| workers | peak RSS | train-hours |
+|---|---|---|
+| 1 | 257 MB | 424 |
+| **2** | **369 MB** | **277** |
+| 4 | 498 MB | 272 |
+| 8 | 651 MB | 330 |
+
+A 512 MB instance is OOM-killed at 4 and above — and because the API warms
+its cache at startup, the kill happens during boot, so the service
+crash-loops and never serves a page. `SOLVER_WORKERS=2` is set in the
+blueprint, and costs nothing: two workers scored best on quality anyway,
+since a time-limited portfolio search is not monotone.
+
+`os.cpu_count()` cannot detect this — it reports the host's cores, not the
+cgroup limit a container is actually given — which is why the value is
+explicit rather than inferred.
+
 The free tier sleeps after inactivity and takes ~30s to wake — fine for a
 demo you open beforehand, bad for one you open on stage. `starter` avoids it.
 

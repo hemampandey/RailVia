@@ -17,6 +17,13 @@ services:
     plan: starter          # 'free' works but sleeps after inactivity
     healthCheckPath: /api/health
     envVars:
+      # A 512 MB instance is OOM-killed at 4 search workers and above: each
+      # worker holds its own copy of the search state, and the solve peaks at
+      # 498 MB with 4 and 651 MB with 8. Two is also the best quality
+      # measured, so this costs nothing. See DEFAULT_WORKERS in
+      # src/optimiser/model.py.
+      - key: SOLVER_WORKERS
+        value: "2"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY

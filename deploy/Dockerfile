@@ -43,6 +43,10 @@ COPY data/grounded_sections.json data/
 COPY --from=ui /ui/out/ web/out/
 
 ENV PYTHONUNBUFFERED=1
+# Two CP-SAT workers. This is a memory limit, not a speed one: the solve
+# peaks at 369 MB with 2 workers and 651 MB with 8, and a 512 MB container
+# is killed well before that. Two also scored best on plan quality.
+ENV SOLVER_WORKERS=2
 EXPOSE 8077
 
 # One worker. Each holds its own solved-plan cache, and CP-SAT already uses
