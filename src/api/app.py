@@ -1,4 +1,7 @@
-"""FastAPI backend.
+"""FastAPI backend — a pure JSON API.
+
+The front end is a separate Next.js app in `web/`, which calls this service
+directly (see the CORS note below). There is no server-rendered UI here.
 
 Solving is expensive (up to 60 seconds), so results are computed once per
 distinct request and cached in-process. A demo must not re-solve on every
@@ -8,11 +11,9 @@ click, and the front end polls nothing.
 from __future__ import annotations
 
 import functools
-import pathlib
 
 from fastapi import Body, FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from src.adapters import GroundedTimetableSource, SyntheticDataSource
@@ -23,8 +24,6 @@ from src.optimiser.model import BlockPlanner
 from src.optimiser.windows import TimeGrid
 from src.store import Approval, Completion, get_store, store_status
 
-STATIC_DIR = pathlib.Path(__file__).resolve().parent / "static"
-
 app = FastAPI(
     title="Automatic Block Planning (SIH26027)",
     description=(
@@ -32,6 +31,23 @@ app = FastAPI(
         "(published Indian Railways timetable); maintenance tasks are synthetic."
     ),
     version="0.5.0",
+)
+
+
+# The Next.js front end calls this service directly rather than through the
+# dev-server proxy: a solve can take 60 seconds and Next's rewrite proxy hangs
+# the socket up long before that (ECONNRESET). Two origins plus CORS is the
+# ordinary shape for a SPA over a separate API, and it removes the proxy as a
+# failure point during a demo.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "http://localhost:3001", "http://127.0.0.1:3001",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 
@@ -355,11 +371,3 @@ def explain_task(
             for name, value in model.explain(instance, task_id)
         ],
     }
-
-
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-    @app.get("/")
-    def index() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html")

@@ -141,61 +141,30 @@ is open to planned work (default: quietest 25%).
 .venv/bin/python scripts/compare.py --grounded --tasks 300 --days 30
 ```
 
-### Browser UI
+### The app
+
+Two processes: a Python API (the optimiser lives here — OR-Tools and LightGBM
+have no Node equivalent) and a Next.js front end.
 
 ```bash
 .venv/bin/uvicorn src.api.app:app --port 8077
 ```
 
-Then open <http://localhost:8077>.
+```bash
+npm --prefix web run dev
+```
 
-Four views onto one job:
+Then open <http://localhost:3000>. The browser calls the API directly on port
+8077 rather than through Next's rewrite proxy — a solve can take 60 seconds
+and the dev proxy drops the socket long before that (`ECONNRESET`). CORS is
+configured for the dev origins; set `NEXT_PUBLIC_API_ORIGIN` to point
+elsewhere.
 
-- **Calendar** — the period at a glance, one cell per day showing how many
-  closures, the train-hours they cost, and which departments are involved.
-  Pick a day to see and act on its closures.
-- **Plan** — the worklist, described below.
-- **Approved** — what has been signed off, by whom and when.
-- **Completed** — jobs reported done.
-
-**The Plan view is a worklist, not a dashboard.** The user is a divisional
-planning officer whose Monday job is: read the closures proposed for the
-coming period, deal with the ones that need a decision, accept the rest. So
-that screen is exactly that —
-
-- a one-line brief (how many closures, how many jobs placed, train-hours
-  saved by sharing, how many need a decision),
-- **the exceptions first**: every job that could not be scheduled, with the
-  reason in plain words and what to do about it,
-- then the closures themselves in time order, grouped by day: when, which
-  section by name, which jobs from which departments share it, what it costs,
-  what sharing saved, and an Accept button.
-
-Deliberately *not* on that screen: solver budget, backlog size, model AUC,
-feature-importance bars. Those are ours, not the planner's; the few useful
-for a demo sit behind an "Evidence and settings" disclosure at the bottom,
-along with the before/after comparison.
-
-Light and dark themes from one set of semantic tokens, Fira Sans/Fira Code
-with tabular figures so numbers do not jitter between solves.
-
-Accessibility was verified in the browser, not assumed:
-
-- Contrast measured in both themes — 6.3:1 to 16.6:1 light, 7.4:1 to 16.5:1
-  dark, against a 4.5:1 requirement.
-- Every control is at least 44x44px; tabs follow the WAI-ARIA pattern with
-  arrow-key navigation and roving `tabindex`.
-- Skip link, visible focus rings, `aria-live` status, and
-  `prefers-reduced-motion` honoured.
-- **Nothing depends on colour alone.** Every job names its department in
-  text next to its colour dot, and every exception states its reason in
-  words.
-
-No build step and no JS dependencies, so the demo cannot fail because of a
-network. Fonts come from Google with `font-display:swap` behind a full system
-fallback: offline the page is typographically plain but entirely functional.
-That is a deliberate departure from the brief's "React + Gantt library"; the
-trade-off is discussed below.
+**Next.js 15 App Router, TypeScript, no UI framework.** Styling is plain CSS
+driven by semantic design tokens, so light and dark come from one set of
+variables. A sidebar carries the four views with live counts, the store status
+and the theme toggle. The plan is fetched once in a context provider shared by
+every route, so switching views never re-solves.
 
 ### Decisions are stored in Supabase
 
@@ -248,8 +217,9 @@ src/optimiser/    CP-SAT model: windows.py (time grid, permitted windows),
                   model.py (solver model), replan.py (disruption re-planning)
 src/ml/           Criticality scoring (LightGBM) + explainability
 src/baseline/     Manual-process simulator and the before/after comparison
-src/api/          FastAPI backend + dependency-free browser UI
+src/api/          FastAPI — a pure JSON API, no server-rendered UI
 src/store/        Supabase persistence for approvals and completions
+web/              Next.js 15 front end (App Router, TypeScript)
 scripts/          CLI entry points
 tests/            pytest — constraint tests mandatory from Phase 1
 ```
@@ -281,12 +251,10 @@ Three, each forced by measurement rather than preference:
    coordination the project exists to demonstrate. Tasks nest inside blocks;
    blocks are what cannot overlap.
 
-3. **The UI is plain JS and SVG rather than React.** The brief says "keep it
-   simple", and a demo that cannot be broken by a slow CDN or hostile venue
-   wifi was worth more than the framework. Everything asked for is there:
-   department colour-coding, shared-block highlighting, weekly/monthly
-   toggle, KPI dashboard, before/after view — plus light/dark theming and a
-   measured accessibility pass.
+3. **The UI is Next.js, and decisions persist to Supabase.** The brief
+   specified React plus a Gantt library, and "SQLite. Sufficient. Do not
+   introduce Postgres." Supabase is hosted Postgres. Both are deliberate
+   choices made during the build rather than oversights.
 
 ## Honest limitations
 

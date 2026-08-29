@@ -88,10 +88,17 @@ def test_comparison_contract():
     assert isinstance(body["headline_reduction_pct"], float)
 
 
-def test_index_page_served():
-    page = client.get("/")
-    assert page.status_code == 200
-    assert "Block Planner" in page.text
+def test_service_is_a_pure_api():
+    """The UI is a separate Next.js app; this service serves JSON only."""
+    assert client.get("/").status_code == 404
+    assert client.get("/api/health").json() == {"status": "ok"}
+
+
+def test_cors_allows_the_next_dev_origin():
+    """The browser calls this service directly — Next's dev proxy drops the
+    socket on a 60-second solve."""
+    res = client.get("/api/health", headers={"Origin": "http://localhost:3000"})
+    assert res.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
 
 # --- decisions: approvals and completions ----------------------------------
