@@ -234,51 +234,45 @@ the key, is what protects the data.
 
 ### Deploying
 
-**The API cannot run on Vercel**, and it is worth knowing why before trying.
-Its dependencies are about 460 MB — OR-Tools 139, SciPy 193, NumPy 64,
-scikit-learn 45 — against a 250 MB serverless limit, and a solve takes ten
-seconds against a ten-second Hobby function timeout. This is a CPU-bound,
-long-running optimiser: the opposite of what serverless is for. No amount of
-`[tool.vercel] entrypoint` configuration changes that.
+One service on Render. The UI is built to static files at image-build time
+and served by FastAPI at run time, so the running container has no Node in
+it, one origin, no CORS and nothing to keep in sync between two deployments.
 
-Split the deployment instead:
+**Not Vercel.** Its dependencies are ~460 MB — OR-Tools 139, SciPy 193,
+NumPy 64, scikit-learn 45 — against a 250 MB serverless limit, and a solve
+takes ten seconds against a ten-second Hobby timeout. This is a CPU-bound,
+long-running optimiser; serverless is the wrong shape for it, and no
+`entrypoint` configuration changes that.
 
-| Part | Where | Why |
-|---|---|---|
-| `web/` (Next.js) | Vercel | Exactly what Vercel is for |
-| API (Python) | Render / Railway / Fly.io | Container, no size limit, no request timeout |
+1. Push to GitHub
+2. Render → **New** → **Blueprint** → point at
+   [`deploy/render.yaml`](deploy/render.yaml)
+3. Fill in four environment variables:
 
-**Front end on Vercel.** The one setting that matters:
-
-> Project → Settings → General → **Root Directory** → `web`
-
-Without it Vercel builds the repository root, finds `requirements.txt`, and
-tries to deploy the Python API — which is what "No FastAPI entrypoint found"
-and the failed deployment both are. `.vercelignore` excludes the Python side
-as a second line of defence, but the Root Directory setting is the fix.
-
-Then add three environment variables under Settings → Environment Variables:
-
-| Variable | Value |
+| Variable | Notes |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | same as in `.env` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same as in `.env` |
-| `NEXT_PUBLIC_API_ORIGIN` | the deployed API's URL |
+| `SUPABASE_URL` | as in `.env` |
+| `SUPABASE_KEY` | the anon key |
+| `NEXT_PUBLIC_SUPABASE_URL` | same URL — baked into the UI at build time |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same key — likewise |
 
-Until the API is deployed, the site will build and sign in, and every view
-will report that it cannot reach the planning API. That is the expected
-half-deployed state, not a new fault.
+The two `NEXT_PUBLIC_*` values are compiled into the front end, so changing
+them needs a redeploy rather than a restart. Both are safe to expose: the
+anon key is designed for browsers, and row-level security is what protects
+the data.
 
-**API on Render.** [`deploy/render.yaml`](deploy/render.yaml) is a blueprint;
-[`deploy/Dockerfile`](deploy/Dockerfile) works anywhere that runs containers.
-Set `SUPABASE_URL`, `SUPABASE_KEY`, and `ALLOWED_ORIGINS` to the Vercel URL
-so CORS admits it. The free tier sleeps after inactivity and takes ~30s to
-wake, which is fine for a demo opened beforehand and bad for one opened on
-stage.
+The free tier sleeps after inactivity and takes ~30s to wake — fine for a
+demo you open beforehand, bad for one you open on stage. `starter` avoids it.
 
-**Or do not deploy at all.** For an idea submission a local demo plus the
-recorded transcript is enough, and it removes a whole category of things that
-can fail on the day.
+To check the production build locally:
+
+```bash
+STATIC_EXPORT=1 NEXT_PUBLIC_API_ORIGIN="" npm --prefix web run build
+.venv/bin/uvicorn src.api.app:app --port 8077
+```
+
+Then open <http://localhost:8077> — UI and API on one port, exactly as
+deployed.
 
 ### Recorded demo (stage backup)
 

@@ -15,3 +15,4 @@ data/instance.json
 *.key
 web/tsconfig.tsbuildinfo
 data/cache/plans/
+web/out/

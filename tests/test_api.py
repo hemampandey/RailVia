@@ -239,3 +239,20 @@ def test_cors_is_never_a_wildcard(monkeypatch):
     from src.api.app import allowed_origins
 
     assert "*" not in allowed_origins()
+
+
+def test_ui_and_api_coexist_on_one_origin():
+    """In production FastAPI serves the built UI as well as the API.
+
+    The mount is at "/", so it must not shadow the API routes — Starlette
+    matches in registration order, which is why the mount is added last.
+    """
+    from src.api.app import UI_DIR
+
+    assert client.get("/api/health").json() == {"status": "ok"}
+    if not UI_DIR.is_dir():
+        pytest.skip("UI not built; run STATIC_EXPORT=1 npm --prefix web run build")
+    for route in ("/", "/plan/", "/approved/", "/completed/"):
+        page = client.get(route)
+        assert page.status_code == 200, route
+        assert "RailVia" in page.text

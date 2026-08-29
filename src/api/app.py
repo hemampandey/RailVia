@@ -14,10 +14,12 @@ import contextlib
 import functools
 import logging
 import os
+import pathlib
 import threading
 
 from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.api import cache
@@ -550,3 +552,24 @@ def explain_task(
             for name, value in model.explain(instance, task_id)
         ],
     }
+
+
+# ── serving the UI ──────────────────────────────────────────────────────
+#
+# In production the Next.js app is built to static files and served from
+# here, so a deployment is one process on one origin: no Node at runtime, no
+# CORS, no proxy, and nothing to keep in sync between two services.
+#
+# Mounted LAST so every /api route is matched first — Starlette resolves
+# routes in registration order, and a mount at "/" would otherwise swallow
+# them.
+UI_DIR = pathlib.Path(__file__).resolve().parents[2] / "web" / "out"
+
+if UI_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=UI_DIR, html=True), name="ui")
+    log.info("serving the UI from %s", UI_DIR)
+else:
+    log.info(
+        "no built UI at %s — run: STATIC_EXPORT=1 npm --prefix web run build",
+        UI_DIR,
+    )
