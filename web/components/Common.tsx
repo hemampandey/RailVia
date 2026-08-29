@@ -27,14 +27,20 @@ export function SetupBanner() {
       <div className="note">
         Approvals and completions are stored in Supabase only — there is no
         local fallback, so two planners can never approve different things
-        without finding out. To switch it on:
+        without finding out. The API needs its own credentials, separately
+        from the ones this page was built with.
       </div>
-      <pre>{`1. Create a project at supabase.com
-2. Run src/store/schema.sql in the SQL editor
-3. Add to .env in the repo root:
-     SUPABASE_URL=https://<project>.supabase.co
-     SUPABASE_KEY=<anon key>
-4. Restart the FastAPI server`}</pre>
+      <pre>{`Set on the server (Render → Environment, or .env locally):
+
+  SUPABASE_URL=https://<project>.supabase.co
+  SUPABASE_KEY=<anon key>
+
+then restart the API.`}</pre>
+      <div className="note">
+        These are the server-side pair. The two <code>NEXT_PUBLIC_</code>
+        {" "}variables are compiled into this page and are already working —
+        you are signed in.
+      </div>
       {store?.detail && <div className="note">{store.detail}</div>}
     </div>
   );

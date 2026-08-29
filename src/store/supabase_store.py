@@ -45,8 +45,18 @@ class SupabaseStore(Store):
         url = url or os.environ.get(URL_VAR)
         key = key or os.environ.get(KEY_VAR)
         if not url or not key:
+            missing = [n for n, v in ((URL_VAR, url), (KEY_VAR, key)) if not v]
+            # Say it in terms of wherever this is actually running. Telling
+            # someone to edit .env on a server that has no .env sends them
+            # looking for a file that is not there.
+            where = (
+                "your hosting provider's environment variables"
+                if os.environ.get("RENDER") or os.environ.get("PORT")
+                else ".env in the repo root (see .env.example)"
+            )
             raise SupabaseNotConfigured(
-                f"set {URL_VAR} and {KEY_VAR} in .env — see .env.example"
+                f"{' and '.join(missing)} not set. Set "
+                f"{' and '.join(missing)} in {where}, then restart."
             )
         try:
             from supabase import create_client
