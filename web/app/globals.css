@@ -261,3 +261,13 @@ td.num,th.num{text-align:right}
 .who .role.eng{background:var(--accent-soft);color:var(--accent)}
 
 .who .role.unknown{background:var(--bad-soft);color:var(--bad)}
+
+/* ── period picker ─────────────────────────────────────────────────── */
+.period{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;
+  margin-left:auto}
+.period select{min-width:168px;font-weight:600;min-height:40px}
+.period .step{min-height:40px;width:40px;padding:0;font-size:17px;line-height:1;
+  display:grid;place-items:center;color:var(--text-muted)}
+.period .seg{margin-left:var(--s2)}
+@media (max-width:640px){.period{margin-left:0;width:100%}
+  .period select{flex:1 1 auto}.period .seg{margin-left:0}}

@@ -10,19 +10,6 @@ export const Fact = ({ value, label, tone }: {
   </div>
 );
 
-export function HorizonToggle() {
-  const { params, setDays } = usePlanner();
-  return (
-    <div className="seg">
-      {[[7, "Week"], [30, "Month"]].map(([days, label]) => (
-        <button key={String(days)} type="button"
-          aria-pressed={params.days === days}
-          onClick={() => setDays(days as number)}>{label}</button>
-      ))}
-    </div>
-  );
-}
-
 export function Loading({ what }: { what: string }) {
   return (
     <>

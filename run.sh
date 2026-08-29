@@ -44,7 +44,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "API  → http://localhost:8077"
-.venv/bin/uvicorn src.api.app:app --port 8077 --host 127.0.0.1 &
+# --reload: without it an edited endpoint keeps serving stale code,
+# which looks exactly like the change not working.
+.venv/bin/uvicorn src.api.app:app --port 8077 --host 127.0.0.1 --reload &
 
 echo "App  → http://localhost:3000"
 npm --prefix web run dev &

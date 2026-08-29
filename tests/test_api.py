@@ -178,3 +178,41 @@ def test_importing_the_api_loads_the_environment():
         for k, v in saved.items():
             if v is not None:
                 os.environ[k] = v
+
+
+# --- choosing the period ---------------------------------------------------
+
+
+def test_horizon_start_is_honoured():
+    """The month picker sends the first of a month; the plan must start there."""
+    for start, days in [("2026-09-01", 30), ("2026-02-01", 28)]:
+        body = client.get("/api/plan", params={
+            **SMALL, "days": days, "time_limit": "4", "horizon_start": start,
+        }).json()
+        assert body["horizon_start"] == start
+        assert body["horizon_days"] == days
+
+
+def test_horizon_start_defaults_to_a_monday():
+    body = client.get("/api/plan", params={**SMALL, "time_limit": "4"}).json()
+    from datetime import date
+
+    assert date.fromisoformat(body["horizon_start"]).weekday() == 0
+
+
+def test_bad_horizon_start_is_a_400_not_a_500():
+    res = client.get("/api/plan", params={**SMALL, "horizon_start": "not-a-date"})
+    assert res.status_code == 400
+    assert "ISO date" in res.json()["detail"]
+
+
+def test_different_months_get_different_plans():
+    """Regression: the disk cache key must include the horizon, or one month
+    is served another month's plan with silently wrong dates."""
+    a = client.get("/api/plan", params={
+        **SMALL, "days": 28, "time_limit": "4", "horizon_start": "2026-09-01"}).json()
+    b = client.get("/api/plan", params={
+        **SMALL, "days": 28, "time_limit": "4", "horizon_start": "2026-10-01"}).json()
+    assert a["horizon_start"] != b["horizon_start"]
+    if a["blocks"] and b["blocks"]:
+        assert a["blocks"][0]["start"][:7] != b["blocks"][0]["start"][:7]

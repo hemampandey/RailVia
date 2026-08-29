@@ -10,12 +10,14 @@ export interface PlanParams {
   tasks: number;
   grounded: boolean;
   timeLimit: number;
+  /** First day of the horizon, ISO. Empty means the coming Monday. */
+  horizonStart: string;
 }
 
 export const DEFAULT_PARAMS: PlanParams = {
   // 10s, not 30: measured, 10 gives a better plan than 30 on this instance.
   // See the note beside DEFAULT_UI_BUDGET in src/api/app.py.
-  days: 7, tasks: 120, grounded: true, timeLimit: 10,
+  days: 7, tasks: 120, grounded: true, timeLimit: 10, horizonStart: "",
 };
 
 /** The FastAPI service. Called directly, not through Next's rewrite proxy:
@@ -24,14 +26,17 @@ export const DEFAULT_PARAMS: PlanParams = {
 export const API_ORIGIN =
   process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8077";
 
-const qs = (p: PlanParams) =>
-  new URLSearchParams({
+const qs = (p: PlanParams) => {
+  const q = new URLSearchParams({
     grounded: String(p.grounded),
     tasks: String(p.tasks),
     days: String(p.days),
     seed: "42",
     time_limit: String(p.timeLimit),
-  }).toString();
+  });
+  if (p.horizonStart) q.set("horizon_start", p.horizonStart);
+  return q.toString();
+};
 
 /** Attach the caller's Supabase access token. The API verifies it and then
  *  acts as that user against Postgres, so row-level security decides what

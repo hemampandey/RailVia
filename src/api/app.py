@@ -24,6 +24,8 @@ from src.adapters import GroundedTimetableSource, SyntheticDataSource
 from src.ingest.railradar import load_dotenv
 from src.baseline.compare import run_comparison
 from src.ml.criticality import CriticalityModel
+from datetime import date
+
 from src.models import PlanningInstance, next_monday
 from src.optimiser.model import BlockPlanner
 from src.optimiser.windows import TimeGrid
@@ -53,7 +55,7 @@ async def lifespan(_app: FastAPI):
     def warm() -> None:
         try:
             plan(grounded=True, tasks=120, days=7, seed=42,
-                 time_limit=DEFAULT_UI_BUDGET)
+                 time_limit=DEFAULT_UI_BUDGET)  # default view
             log.info("warm cache ready for the default view")
         except Exception as exc:  # noqa: BLE001
             log.warning("cache warming failed: %s", exc)
@@ -96,28 +98,50 @@ app.add_middleware(
 )
 
 
-@functools.lru_cache(maxsize=8)
-def _load(grounded: bool, tasks: int, days: int, seed: int) -> PlanningInstance:
+def _parse_start(value: str | None) -> date:
+    """The first day of the planning horizon.
+
+    Defaults to the Monday of the coming week. A caller may name any date —
+    the month picker sends the first of a month.
+    """
+    if not value:
+        return next_monday()
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"horizon_start must be an ISO date (YYYY-MM-DD), got {value!r}",
+        ) from exc
+
+
+@functools.lru_cache(maxsize=16)
+def _load(
+    grounded: bool, tasks: int, days: int, seed: int, start: date
+) -> PlanningInstance:
     source = (
-        GroundedTimetableSource(seed=seed, n_tasks=tasks, horizon_days=days)
+        GroundedTimetableSource(seed=seed, n_tasks=tasks, horizon_days=days,
+                                horizon_start=start)
         if grounded
-        else SyntheticDataSource(seed=seed, n_tasks=tasks, horizon_days=days)
+        else SyntheticDataSource(seed=seed, n_tasks=tasks, horizon_days=days,
+                                 horizon_start=start)
     )
     return source.load()
 
 
-@functools.lru_cache(maxsize=4)
-def _criticality(grounded: bool, tasks: int, days: int, seed: int):
-    instance = _load(grounded, tasks, days, seed)
+@functools.lru_cache(maxsize=8)
+def _criticality(grounded: bool, tasks: int, days: int, seed: int, start: date):
+    instance = _load(grounded, tasks, days, seed, start)
     model = CriticalityModel()
     report = model.train(instance.sections)
     return model, report, model.score_instance(instance)
 
 
 @functools.lru_cache(maxsize=4)
-def _comparison(grounded: bool, tasks: int, days: int, seed: int, time_limit: float):
-    instance = _load(grounded, tasks, days, seed)
-    _, _, scores = _criticality(grounded, tasks, days, seed)
+def _comparison(grounded: bool, tasks: int, days: int, seed: int,
+                time_limit: float, start: date):
+    instance = _load(grounded, tasks, days, seed, start)
+    _, _, scores = _criticality(grounded, tasks, days, seed, start)
     return run_comparison(instance, time_limit=time_limit, criticality=scores)
 
 
@@ -169,9 +193,10 @@ def health() -> dict:
 
 @app.get("/api/instance")
 def instance_summary(
-    grounded: bool = True, tasks: int = 120, days: int = 30, seed: int = 42
+    grounded: bool = True, tasks: int = 120, days: int = 7, seed: int = 42,
+    horizon_start: str | None = None,
 ) -> dict:
-    instance = _load(grounded, tasks, days, seed)
+    instance = _load(grounded, tasks, days, seed, _parse_start(horizon_start))
     return {
         "instance_id": instance.instance_id,
         "horizon_start": instance.horizon_start.isoformat(),
@@ -193,11 +218,11 @@ def instance_summary(
     }
 
 
-@functools.lru_cache(maxsize=4)
+@functools.lru_cache(maxsize=8)
 def _plan(grounded: bool, tasks: int, days: int, seed: int, time_limit: float,
-          percentile: float):
-    instance = _load(grounded, tasks, days, seed)
-    _, _, scores = _criticality(grounded, tasks, days, seed)
+          percentile: float, start: date):
+    instance = _load(grounded, tasks, days, seed, start)
+    _, _, scores = _criticality(grounded, tasks, days, seed, start)
     planner = BlockPlanner(
         instance, time_limit=time_limit, percentile=percentile, criticality=scores
     )
@@ -208,22 +233,24 @@ def _plan(grounded: bool, tasks: int, days: int, seed: int, time_limit: float,
 def plan(
     grounded: bool = True, tasks: int = 120, days: int = 7,
     seed: int = 42, time_limit: float = DEFAULT_UI_BUDGET,
-    percentile: float = 25.0,
+    percentile: float = 25.0, horizon_start: str | None = None,
 ) -> dict:
-    # The horizon rolls to the coming Monday, so it MUST be part of the key.
-    # Without it, next week would be served this week's plan from disk — the
-    # dates would silently be wrong, which is worse than a slow solve.
+    # The horizon is chosen by the caller and defaults to the coming Monday,
+    # so it MUST be part of the key. Without it a different month would be
+    # served this one's plan from disk — silently wrong dates, which is worse
+    # than a slow solve.
+    start = _parse_start(horizon_start)
     cache_key = cache.key(
         grounded=grounded, tasks=tasks, days=days, seed=seed,
         time_limit=time_limit, percentile=percentile,
-        horizon_start=next_monday().isoformat(),
+        horizon_start=start.isoformat(),
     )
     cached = cache.load(cache_key)
     if cached is not None:
         return cached
 
     instance, planner, solution, scores = _plan(
-        grounded, tasks, days, seed, time_limit, percentile
+        grounded, tasks, days, seed, time_limit, percentile, start
     )
     tasks_by_id = {t.id: t for t in instance.tasks}
 
@@ -285,10 +312,12 @@ def plan(
 
 @app.get("/api/comparison")
 def comparison(
-    grounded: bool = True, tasks: int = 120, days: int = 30,
-    seed: int = 42, time_limit: float = 30.0,
+    grounded: bool = True, tasks: int = 120, days: int = 7,
+    seed: int = 42, time_limit: float = DEFAULT_UI_BUDGET,
+    horizon_start: str | None = None,
 ) -> dict:
-    result = _comparison(grounded, tasks, days, seed, time_limit)
+    result = _comparison(grounded, tasks, days, seed, time_limit,
+                         _parse_start(horizon_start))
     grid = TimeGrid(result.instance.horizon_start, result.instance.horizon_days, 15)
     tasks_by_id = {t.id: t for t in result.instance.tasks}
     return {
@@ -452,10 +481,12 @@ def remove_completion(
 
 @app.get("/api/criticality")
 def criticality(
-    grounded: bool = True, tasks: int = 120, days: int = 30, seed: int = 42
+    grounded: bool = True, tasks: int = 120, days: int = 7, seed: int = 42,
+    horizon_start: str | None = None,
 ) -> dict:
-    model, report, scores = _criticality(grounded, tasks, days, seed)
-    instance = _load(grounded, tasks, days, seed)
+    start = _parse_start(horizon_start)
+    model, report, scores = _criticality(grounded, tasks, days, seed, start)
+    instance = _load(grounded, tasks, days, seed, start)
     tasks_by_id = {t.id: t for t in instance.tasks}
     ranked = sorted(scores.items(), key=lambda kv: -kv[1])
     return {
@@ -484,10 +515,11 @@ def criticality(
 @app.get("/api/criticality/{task_id}")
 def explain_task(
     task_id: str, grounded: bool = True, tasks: int = 120,
-    days: int = 30, seed: int = 42,
+    days: int = 7, seed: int = 42, horizon_start: str | None = None,
 ) -> dict:
-    model, _, scores = _criticality(grounded, tasks, days, seed)
-    instance = _load(grounded, tasks, days, seed)
+    start = _parse_start(horizon_start)
+    model, _, scores = _criticality(grounded, tasks, days, seed, start)
+    instance = _load(grounded, tasks, days, seed, start)
     if task_id not in scores:
         raise HTTPException(status_code=404, detail=f"unknown task {task_id}")
     return {

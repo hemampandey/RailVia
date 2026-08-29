@@ -2,7 +2,8 @@
 
 import { usePlanner } from "@/components/PlannerProvider";
 import { BlockRow } from "@/components/BlockRow";
-import { Fact, HorizonToggle, Loading } from "@/components/Common";
+import { Fact, Loading } from "@/components/Common";
+import { PeriodPicker } from "@/components/PeriodPicker";
 import { RoleWarning } from "@/components/RoleWarning";
 import { Icon, PATH } from "@/components/icons";
 import { DEPT_VAR } from "@/lib/types";
@@ -22,8 +23,11 @@ export default function PlanPage() {
       <RoleWarning />
       <div className="brief">
         <div className="brief-top">
-          <h2>Proposed closures</h2>
-          <HorizonToggle />
+          <h2>
+            {new Date(plan.horizon_start + "T00:00:00")
+              .toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+          </h2>
+          <PeriodPicker />
         </div>
         <div className="facts">
           <Fact value={String(plan.block_count)} label="closures proposed" />

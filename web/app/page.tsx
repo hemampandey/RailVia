@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { usePlanner } from "@/components/PlannerProvider";
 import { BlockRow } from "@/components/BlockRow";
-import { Fact, HorizonToggle, Loading } from "@/components/Common";
+import { Fact, Loading } from "@/components/Common";
+import { PeriodPicker } from "@/components/PeriodPicker";
 import { RoleWarning } from "@/components/RoleWarning";
 import { DEPT_VAR, type Block } from "@/lib/types";
 
@@ -25,8 +26,15 @@ export default function CalendarPage() {
   const first = new Date(plan.horizon_start + "T00:00:00");
   const last = new Date(first.getTime() + (plan.horizon_days - 1) * 86400000);
   const lead = (first.getDay() + 6) % 7; // 0 = Monday
-  const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { day: "numeric", month: "long" });
+  // A whole calendar month names itself; anything else states its span.
+  const wholeMonth =
+    first.getDate() === 1
+    && last.getMonth() === first.getMonth()
+    && last.getDate() === new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const heading = wholeMonth
+    ? first.toLocaleDateString(undefined, { month: "long", year: "numeric" })
+    : `${first.toLocaleDateString(undefined, { day: "numeric", month: "long" })} – `
+      + `${last.toLocaleDateString(undefined, { day: "numeric", month: "long" })}`;
 
   const chosen = selected ? byDay.get(selected) ?? [] : [];
 
@@ -36,8 +44,8 @@ export default function CalendarPage() {
       <RoleWarning />
       <div className="brief">
         <div className="brief-top">
-          <h2>{fmt(first)} – {fmt(last)}</h2>
-          <HorizonToggle />
+          <h2>{heading}</h2>
+          <PeriodPicker />
         </div>
         <div className="facts">
           <Fact value={String(plan.block_count)} label="closures scheduled" />
