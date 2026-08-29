@@ -13,3 +13,4 @@ data/instance.json
 .env
 .env.local
 *.key
+web/tsconfig.tsbuildinfo
