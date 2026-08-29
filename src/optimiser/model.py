@@ -166,6 +166,8 @@ class BlockPlanner:
         self.runs = {sid: permitted_runs(p) for sid, p in self.permitted.items()}
 
         self.model = cp_model.CpModel()
+        self._hint_applied = False
+        self.greedy = None
         self._build()
 
     # -- helpers -------------------------------------------------------------
@@ -471,7 +473,12 @@ class BlockPlanner:
 
     # -- solve ---------------------------------------------------------------
 
-    def solve(self, log_search: bool = False, workers: int = 8) -> Solution:
+    def solve(
+        self,
+        log_search: bool = False,
+        workers: int = 8,
+        warm_start: bool = True,
+    ) -> Solution:
         """Solve within the wall-clock budget.
 
         On reproducibility, which the brief rightly demands (section 10): the
@@ -495,6 +502,20 @@ class BlockPlanner:
         produces that range. The seed below removes one source of variation
         but does not remove worker interleaving.
         """
+        # Hand CP-SAT a feasible schedule to start from. Without it the
+        # search spends much of a short budget finding any good solution at
+        # all, and where it lands depends on worker interleaving — which is
+        # what made the headline swing 9.5-24.5% between runs.
+        self.hinted_vars = 0
+        if warm_start and not self._hint_applied:
+            from src.optimiser.warmstart import apply_hint, build_greedy
+
+            self.greedy = build_greedy(self)
+            self.hinted_vars = apply_hint(self, self.greedy)
+            self._hint_applied = True
+            log.info("warm start: %d tasks placed, %d vars hinted",
+                     self.greedy.placed, self.hinted_vars)
+
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = self.time_limit
         solver.parameters.num_search_workers = workers
