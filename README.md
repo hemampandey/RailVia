@@ -163,6 +163,14 @@ npm --prefix web run dev
 If the browser says it cannot reach the planning API, the Python half is not
 running — that is the usual cause.
 
+If the page loads completely unstyled, or the terminal shows
+`Cannot find module './847.js'`, Next's build cache is inconsistent. That
+happens when the dev server is killed mid-write. Clear it:
+
+```bash
+./run.sh --clean
+```
+
 Then open <http://localhost:3000>. The browser calls the API directly on port
 8077 rather than through Next's rewrite proxy — a solve can take 60 seconds
 and the dev proxy drops the socket long before that (`ECONNRESET`). CORS is

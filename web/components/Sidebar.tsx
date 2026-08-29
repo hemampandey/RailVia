@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Icon, PATH } from "./icons";
 import { ThemeToggle } from "./ThemeToggle";
@@ -17,8 +18,14 @@ const NAV = [
 
 export function Sidebar() {
   const path = usePathname();
-  const { plan, store, approvals, completions } = usePlanner();
+  const { plan, approvals, completions } = usePlanner();
   const { me, session, signOut, error: authError } = useAuth();
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--sidebar", collapsed ? "72px" : "236px");
+  }, [collapsed]);
 
   /** Counts on the nav so the sidebar says what needs attention without
    *  making anyone open each view to find out. */
@@ -35,21 +42,39 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="side">
+    <aside className={"side" + (collapsed ? " collapsed" : "")}>
       <div className="brand">
-        <span className="mark" aria-hidden="true">
-          <Icon d={PATH.rail} size={14} />
-        </span>
-        <b>RailVia</b>
+        <button
+          type="button"
+          className="collapse-toggle"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-pressed={collapsed}
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <span aria-hidden="true">{collapsed ? "›" : "‹"}</span>
+        </button>
+        {!collapsed && (
+          <>
+            <span className="mark" aria-hidden="true">
+              <Icon d={PATH.rail} size={14} />
+            </span>
+            <b>RailVia</b>
+          </>
+        )}
       </div>
       <nav aria-label="Views">
         {NAV.map((item) => {
           const b = badge(item.href);
           return (
-            <Link key={item.href} href={item.href}
-              aria-current={path === item.href ? "page" : undefined}>
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={path === item.href ? "page" : undefined}
+              title={collapsed ? item.label : undefined}
+            >
               <Icon d={item.icon} size={16} />
-              {item.label}
+              {!collapsed && <span className="nav-label">{item.label}</span>}
               {b && (
                 <span className={"count" + (b.warn ? " warn" : "")}>{b.text}</span>
               )}
@@ -58,7 +83,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="side-foot">
-        {session && (
+        {!collapsed && session && (
           <div className="who">
             <b>{me?.email ?? session.user.email}</b>
             <span className={"role" + (me?.role === "engineer" ? " eng" : "")
@@ -68,8 +93,8 @@ export function Sidebar() {
             </span>
           </div>
         )}
-        <ThemeToggle />
-        {session && (
+        {!collapsed && <ThemeToggle />}
+        {!collapsed && session && (
           <button className="theme-btn" type="button" onClick={signOut}>
             Sign out
           </button>
