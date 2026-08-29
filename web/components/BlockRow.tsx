@@ -11,7 +11,9 @@ function JobChip({ job, done }: { job: Job; done: boolean }) {
   return (
     <span className={"job" + (job.overdue && !done ? " od" : "")}>
       <i style={{ background: DEPT_VAR[job.department] ?? "var(--text-faint)" }} />
-      {job.department} · {job.activity.replace(/_/g, " ")}
+      <span style={{ fontWeight: 700 }}>{job.department}</span>
+      <span>·</span>
+      <span>{job.activity.replace(/_/g, " ")}</span>
       {done ? " · done" : job.overdue ? " · overdue" : ""}
     </span>
   );
@@ -30,9 +32,7 @@ export function BlockRow({ block, showDate = false }: {
   const approved = isApproved(block);
   const done = isDone(block);
   const connected = !!store?.connected;
-  // The head grants closures; engineers report work done. The buttons follow
-  // the same split Postgres enforces, so nobody is offered an action that
-  // will be refused.
+
   const canApprove = connected && !!me?.can_approve;
   const canComplete = connected && !!me?.can_complete;
   const approveWhy = !connected
@@ -40,6 +40,7 @@ export function BlockRow({ block, showDate = false }: {
     : me?.can_approve
       ? undefined
       : "Only the divisional head can grant a closure";
+
   const start = new Date(block.start);
   const end = new Date(block.end);
   const sameDay = start.toDateString() === end.toDateString();
@@ -58,18 +59,27 @@ export function BlockRow({ block, showDate = false }: {
       + (block.overdue_count && !done ? " has-overdue" : "")
       + (done ? " done" : "")}>
       <div className="when">
-        {start.toTimeString().slice(0, 5)}–{end.toTimeString().slice(0, 5)}
+        <div>{start.toTimeString().slice(0, 5)}–{end.toTimeString().slice(0, 5)}</div>
         <small>
           {showDate
             ? start.toLocaleDateString(undefined, { day: "numeric", month: "short" }) + " · "
             : ""}
-          {block.hours} h{sameDay ? "" : " · +1d"}
+          {block.hours} h window{sameDay ? "" : " (+1d)"}
         </small>
       </div>
 
       <div>
         <div className="where">
-          {sectionName}<code>{block.section_id}</code>
+          <span>{sectionName}</span>
+          <code>{block.section_id}</code>
+          {block.shared && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, color: "var(--good)",
+              background: "var(--good-soft)", padding: "2px 8px", borderRadius: 999
+            }}>
+              Coordinated ({block.departments.length} Depts)
+            </span>
+          )}
         </div>
         <div className="jobs">
           {block.tasks.map((t) => (
@@ -78,7 +88,7 @@ export function BlockRow({ block, showDate = false }: {
         </div>
         {record && (
           <div className="meta">
-            approved by {record.decided_by} ·{" "}
+            Approved by <b>{record.decided_by}</b> on{" "}
             {new Date(record.decided_at).toLocaleString()}
           </div>
         )}
@@ -89,7 +99,7 @@ export function BlockRow({ block, showDate = false }: {
         <b>{block.train_hours.toFixed(1)}</b>
         <span>train-hours</span>
         {block.saving > 0.05 && (
-          <span className="save">saves {block.saving.toFixed(1)} by sharing</span>
+          <span className="save">⚡ Saves {block.saving.toFixed(1)}h by sharing</span>
         )}
         <div className="acts">
           <button type="button" className={approved ? "on" : ""}

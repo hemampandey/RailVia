@@ -30,7 +30,7 @@ export function ThemeToggle() {
     <button className="theme-btn" onClick={toggle} type="button"
       aria-pressed={dark} aria-label="Switch colour theme">
       <Icon d={dark ? PATH.sun : PATH.moon} size={15} />
-      {dark ? "Light mode" : "Dark mode"}
+      <span>{dark ? "Light mode" : "Dark mode"}</span>
     </button>
   );
 }

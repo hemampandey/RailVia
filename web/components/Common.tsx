@@ -2,11 +2,22 @@
 
 import { usePlanner } from "./PlannerProvider";
 
-export const Fact = ({ value, label, tone }: {
-  value: string; label: string; tone?: "win" | "warn";
+export const Fact = ({ value, label, tone, progress }: {
+  value: string;
+  label: string;
+  tone?: "win" | "warn";
+  progress?: number;
 }) => (
-  <div className={"fact" + (tone ? " " + tone : "")}>
-    <b>{value}</b><span>{label}</span>
+  <div className={"kpi-card" + (tone ? " " + tone : "")}>
+    <div className="kpi-head">
+      <span className="kpi-label">{label}</span>
+    </div>
+    <div className="kpi-val">{value}</div>
+    {progress !== undefined && (
+      <div className="kpi-progress">
+        <div className="kpi-progress-bar" style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+      </div>
+    )}
   </div>
 );
 
