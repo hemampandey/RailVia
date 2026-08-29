@@ -46,6 +46,11 @@ def main() -> int:
         print("        Supabase → Project Settings → API → JWT Secret,")
         print("        then add it to .env and restart the API.")
 
+    # IMPORTANT: this reads with the anon key, and the "read own profile"
+    # policy restricts rows to auth.uid() = id. Anonymously that matches
+    # nothing, so an empty result proves nothing at all — it does NOT mean
+    # there are no users. Only the SQL editor (which bypasses RLS) can answer
+    # that, so we say so rather than reporting a false failure.
     try:
         rows = (store.client.table("profiles")
                 .select("id, role, full_name, department").execute().data) or []
@@ -54,11 +59,25 @@ def main() -> int:
         return 1
 
     if not rows:
-        print(f"[{BAD}] no users yet")
-        print("        Supabase → Authentication → Users → Add user (twice),")
-        print("        then run the promote SQL at the bottom of "
-              "src/store/schema.sql")
-        return 1
+        print(f"[{WARN}] cannot see any profiles from here")
+        print("        Expected: row-level security only shows a user their")
+        print("        own profile, and this check is not signed in. It")
+        print("        cannot tell whether your users exist.")
+        print("        Run this in the Supabase SQL editor to find out:")
+        print()
+        print("          select u.email, p.role, p.full_name")
+        print("            from auth.users u")
+        print("            left join public.profiles p on p.id = u.id;")
+        print()
+        print("        A user with a NULL role means the profiles trigger did")
+        print("        not fire — usually because the account was created")
+        print("        before schema.sql was run. Fix with:")
+        print()
+        print("          insert into public.profiles (id, role)")
+        print("          select id, 'engineer' from auth.users")
+        print("           where id not in (select id from public.profiles);")
+        print()
+        return 1 if problems else 0
 
     heads = [r for r in rows if r["role"] == "head"]
     engineers = [r for r in rows if r["role"] == "engineer"]
