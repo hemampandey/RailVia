@@ -145,3 +145,75 @@ def test_impossible_tasks_are_left_unplaced():
     planner = BlockPlanner(instance, time_limit=5)
     greedy = build_greedy(planner)
     assert "T1" in greedy.unplaced
+
+
+def test_greedy_fallback_produces_a_usable_schedule():
+    """A solver that returns nothing must not produce an empty calendar.
+
+    On a constrained instance — half a CPU on a small cloud plan — a short
+    budget can expire before CP-SAT returns any solution at all. The warm
+    start has already built a feasible schedule in milliseconds, so that is
+    what the user should get; the symptom otherwise is a month of empty days
+    with no error to explain it.
+
+    The fallback is exercised directly rather than by starving the solver: a
+    small instance solves instantly however little time it is given, so a
+    timing-based test would pass for the wrong reason.
+    """
+    instance = build_instance(
+        {"S1": NIGHT_SPARSE, "S2": NIGHT_SPARSE},
+        [task(f"T{i}", "S1" if i % 2 else "S2", 60, dept=list(Department)[i % 3])
+         for i in range(8)],
+        horizon_days=5,
+    )
+    planner = BlockPlanner(instance, time_limit=10)
+    planner.greedy = build_greedy(planner)
+    solution = planner._solution_from_greedy("UNKNOWN", 0.4)
+
+    assert solution.blocks, "fallback produced nothing"
+    assert solution.scheduled_count > 0
+    assert solution.train_hours_lost >= 0
+    # Every block carries work and has positive duration.
+    for block in solution.blocks:
+        assert block.task_ids
+        assert block.end_slot > block.start_slot
+
+
+def test_greedy_fallback_is_labelled_not_disguised():
+    """A plan the solver did not optimise must say so."""
+    instance = build_instance(
+        {"S1": NIGHT_SPARSE},
+        [task("T1", "S1", 60), task("T2", "S1", 60, dept=Department.SNT)],
+        horizon_days=3,
+    )
+    planner = BlockPlanner(instance, time_limit=10)
+    planner.greedy = build_greedy(planner)
+    solution = planner._solution_from_greedy("UNKNOWN", 0.2)
+    assert solution.status == "UNKNOWN+GREEDY"
+
+
+def test_greedy_fallback_respects_permitted_windows():
+    instance = build_instance(
+        {"S1": NIGHT_SPARSE}, [task("T1", "S1", 60)], horizon_days=3
+    )
+    planner = BlockPlanner(instance, time_limit=10)
+    planner.greedy = build_greedy(planner)
+    solution = planner._solution_from_greedy("UNKNOWN", 0.1)
+    for block in solution.blocks:
+        permitted = planner.permitted[block.section_id]
+        assert all(permitted[s] for s in range(block.start_slot, block.end_slot))
+
+
+def test_fallback_accounts_for_every_task():
+    """Whatever the greedy could not place must appear as unscheduled, not
+    vanish."""
+    instance = build_instance(
+        {"S1": NIGHT_SPARSE},
+        [task(f"T{i}", "S1", 60) for i in range(4)],
+        horizon_days=2,
+    )
+    planner = BlockPlanner(instance, time_limit=10)
+    planner.greedy = build_greedy(planner)
+    solution = planner._solution_from_greedy("UNKNOWN", 0.1)
+    accounted = solution.scheduled_count + len(solution.unscheduled_task_ids)
+    assert accounted == len(instance.tasks)

@@ -493,6 +493,59 @@ class BlockPlanner:
 
     # -- solve ---------------------------------------------------------------
 
+    def _solution_from_greedy(self, status_name: str, wall: float) -> Solution:
+        """Turn the warm-start schedule into a Solution.
+
+        Same shape the solver would have produced, so every caller — the API,
+        the comparison, the UI — is unaffected. The status carries the
+        solver's own verdict with a marker, so a plan built this way is never
+        mistaken for one the solver optimised.
+        """
+        tasks_by_id = {t.id: t for t in self.instance.tasks}
+        by_block: dict[tuple[str, int], list[str]] = {}
+        for task_id, placement in self.greedy.placements.items():
+            key = (tasks_by_id[task_id].section_id, placement.run_index)
+            by_block.setdefault(key, []).append(task_id)
+
+        blocks: list[ScheduledBlock] = []
+        total = 0.0
+        for (section_id, run_index), task_ids in by_block.items():
+            extent = self.greedy.extents.get((section_id, run_index))
+            if extent is None:
+                continue
+            start, end = extent
+            series = self.traffic[section_id]
+            cost = round(
+                sum(series[s] for s in range(start, min(end, len(series))))
+                * self.grid.slot_hours, 3,
+            )
+            total += cost
+            blocks.append(
+                ScheduledBlock(
+                    section_id=section_id, start_slot=start, end_slot=end,
+                    task_ids=sorted(task_ids),
+                    departments=sorted(
+                        {tasks_by_id[t].department for t in task_ids},
+                        key=lambda d: d.value,
+                    ),
+                    train_hours=cost,
+                )
+            )
+        blocks.sort(key=lambda b: (b.start_slot, b.section_id))
+        placed = set(self.greedy.placements)
+        return Solution(
+            status=f"{status_name}+GREEDY",
+            blocks=blocks,
+            unscheduled_task_ids=[
+                t.id for t in self.instance.tasks if t.id not in placed
+            ],
+            train_hours_lost=round(total, 3),
+            objective=0.0,
+            wall_time=wall,
+            best_bound=0.0,
+            impossible_task_ids=list(self.impossible),
+        )
+
     def solve(
         self,
         log_search: bool = False,
@@ -554,6 +607,22 @@ class BlockPlanner:
         )
 
         if not ok:
+            # The solver found nothing in the time allowed. That is not the
+            # same as there being nothing to do: the warm start already built
+            # a feasible schedule in milliseconds, so return that rather than
+            # an empty plan.
+            #
+            # Not hypothetical. On half a CPU — a small cloud instance — a
+            # ten-second budget can expire before CP-SAT returns any solution
+            # at all, and the user sees an empty calendar with no error to
+            # explain it.
+            if self.greedy is not None and self.greedy.placements:
+                log.warning(
+                    "solver returned %s in %.1fs; using the greedy schedule "
+                    "(%d tasks placed)",
+                    status_name, solver.WallTime(), self.greedy.placed,
+                )
+                return self._solution_from_greedy(status_name, solver.WallTime())
             return Solution(
                 status=status_name, blocks=[],
                 unscheduled_task_ids=[t.id for t in self.instance.tasks],
