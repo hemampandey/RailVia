@@ -42,7 +42,6 @@ export default function CalendarPage() {
     <>
       <div className="page-header">
         <h1>
-          <span className="live-dot" title="Live CP-SAT Solver" />
           Calendar Schedule
         </h1>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
