@@ -5,7 +5,6 @@ import { usePlanner } from "@/components/PlannerProvider";
 import { BlockRow } from "@/components/BlockRow";
 import { Fact, Loading } from "@/components/Common";
 import { PeriodPicker } from "@/components/PeriodPicker";
-import { RoleWarning } from "@/components/RoleWarning";
 import { DEPT_VAR, type Block } from "@/lib/types";
 
 export default function CalendarPage() {
@@ -41,7 +40,6 @@ export default function CalendarPage() {
   return (
     <>
       <h1>Calendar</h1>
-      <RoleWarning />
       <div className="brief">
         <div className="brief-top">
           <h2>{heading}</h2>
