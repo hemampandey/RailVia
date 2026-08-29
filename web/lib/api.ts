@@ -14,10 +14,28 @@ export interface PlanParams {
   horizonStart: string;
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+export const isoDate = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+export const daysInMonth = (y: number, m: number) =>
+  new Date(y, m + 1, 0).getDate();
+
+/** Planning parameters for one calendar month. */
+export function monthParams(first: Date): Pick<PlanParams, "horizonStart" | "days"> {
+  return {
+    horizonStart: isoDate(new Date(first.getFullYear(), first.getMonth(), 1)),
+    // The month's real length — February is not 30 days, and a plan running
+    // past the end of the month it claims to cover is wrong.
+    days: daysInMonth(first.getFullYear(), first.getMonth()),
+  };
+}
+
 export const DEFAULT_PARAMS: PlanParams = {
   // 10s, not 30: measured, 10 gives a better plan than 30 on this instance.
   // See the note beside DEFAULT_UI_BUDGET in src/api/app.py.
-  days: 7, tasks: 120, grounded: true, timeLimit: 10, horizonStart: "",
+  tasks: 120, grounded: true, timeLimit: 10,
+  ...monthParams(new Date()),
 };
 
 /** The FastAPI service. Called directly, not through Next's rewrite proxy:

@@ -25,15 +25,8 @@ export default function CalendarPage() {
   const first = new Date(plan.horizon_start + "T00:00:00");
   const last = new Date(first.getTime() + (plan.horizon_days - 1) * 86400000);
   const lead = (first.getDay() + 6) % 7; // 0 = Monday
-  // A whole calendar month names itself; anything else states its span.
-  const wholeMonth =
-    first.getDate() === 1
-    && last.getMonth() === first.getMonth()
-    && last.getDate() === new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-  const heading = wholeMonth
-    ? first.toLocaleDateString(undefined, { month: "long", year: "numeric" })
-    : `${first.toLocaleDateString(undefined, { day: "numeric", month: "long" })} – `
-      + `${last.toLocaleDateString(undefined, { day: "numeric", month: "long" })}`;
+  const heading = first.toLocaleDateString(
+    undefined, { month: "long", year: "numeric" });
 
   const chosen = selected ? byDay.get(selected) ?? [] : [];
 

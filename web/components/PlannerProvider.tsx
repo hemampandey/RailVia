@@ -26,7 +26,6 @@ interface Ctx {
   params: PlanParams;
   loading: boolean;
   error: string | null;
-  setDays: (d: number) => void;
   setParams: (p: Partial<PlanParams>) => void;
   reload: () => void;
   toggleApproval: (b: Block) => Promise<void>;
@@ -54,11 +53,6 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const saved = Number(localStorage.getItem("bp-days"));
-    if (saved === 7 || saved === 30) setParamsState((p) => ({ ...p, days: saved }));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,11 +94,6 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [params, tick, token]);
 
-  const setDays = useCallback((d: number) => {
-    localStorage.setItem("bp-days", String(d));
-    setParamsState((p) => ({ ...p, days: d }));
-  }, []);
-
   const setParams = useCallback((patch: Partial<PlanParams>) => {
     setParamsState((p) => ({ ...p, ...patch }));
   }, []);
@@ -143,10 +132,10 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<Ctx>(() => ({
     plan, store, approvals, completions, params, loading, error,
-    setDays, setParams, reload: () => setTick((t) => t + 1),
+    setParams, reload: () => setTick((t) => t + 1),
     toggleApproval, toggleDone, isApproved, isDone,
   }), [plan, store, approvals, completions, params, loading, error,
-    setDays, setParams, toggleApproval, toggleDone, isApproved, isDone]);
+    setParams, toggleApproval, toggleDone, isApproved, isDone]);
 
   return (
     <PlannerContext.Provider value={value}>{children}</PlannerContext.Provider>
