@@ -1,0 +1,25 @@
+# Render blueprint for the planning API.
+#
+#   1. Push this repo to GitHub
+#   2. Render → New → Blueprint → point at this file
+#   3. Add the environment variables below in the dashboard
+#   4. Copy the service URL into Vercel as NEXT_PUBLIC_API_ORIGIN
+#
+# The free tier sleeps after inactivity and takes ~30s to wake. That is fine
+# for a demo you open beforehand, and bad for one you open on stage — start it
+# a few minutes early, or use a paid instance for the day.
+services:
+  - type: web
+    name: railvia-api
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    plan: starter          # 'free' works; starter avoids the sleep
+    healthCheckPath: /api/health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false        # set in the dashboard, never in the repo
+      - key: SUPABASE_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false        # e.g. https://railvia.vercel.app

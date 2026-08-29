@@ -232,6 +232,38 @@ The JWT secret is under Project Settings → API. The anon key is public by
 design — it is safe in a browser precisely because row-level security, not
 the key, is what protects the data.
 
+### Deploying
+
+**The API cannot run on Vercel**, and it is worth knowing why before trying.
+Its dependencies are about 460 MB — OR-Tools 139, SciPy 193, NumPy 64,
+scikit-learn 45 — against a 250 MB serverless limit, and a solve takes ten
+seconds against a ten-second Hobby function timeout. This is a CPU-bound,
+long-running optimiser: the opposite of what serverless is for. No amount of
+`[tool.vercel] entrypoint` configuration changes that.
+
+Split the deployment instead:
+
+| Part | Where | Why |
+|---|---|---|
+| `web/` (Next.js) | Vercel | Exactly what Vercel is for |
+| API (Python) | Render / Railway / Fly.io | Container, no size limit, no request timeout |
+
+**Front end on Vercel.** Import the repo and set **Root Directory** to
+`web/`. Add two environment variables — `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` — plus `NEXT_PUBLIC_API_ORIGIN` pointing at
+the deployed API.
+
+**API on Render.** [`deploy/render.yaml`](deploy/render.yaml) is a blueprint;
+[`deploy/Dockerfile`](deploy/Dockerfile) works anywhere that runs containers.
+Set `SUPABASE_URL`, `SUPABASE_KEY`, and `ALLOWED_ORIGINS` to the Vercel URL
+so CORS admits it. The free tier sleeps after inactivity and takes ~30s to
+wake, which is fine for a demo opened beforehand and bad for one opened on
+stage.
+
+**Or do not deploy at all.** For an idea submission a local demo plus the
+recorded transcript is enough, and it removes a whole category of things that
+can fail on the day.
+
 ### Recorded demo (stage backup)
 
 ```bash

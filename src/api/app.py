@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import logging
+import os
 import threading
 
 from fastapi import Body, FastAPI, Header, HTTPException
@@ -86,12 +87,31 @@ app = FastAPI(
 # warm start does most of the work in milliseconds; the solver refines it.
 DEFAULT_UI_BUDGET = 10.0
 
+LOCAL_ORIGINS = [
+    "http://localhost:3000", "http://127.0.0.1:3000",
+    "http://localhost:3001", "http://127.0.0.1:3001",
+]
+
+
+def allowed_origins() -> list[str]:
+    """Origins permitted to call this API.
+
+    Local development origins are always allowed; a deployment adds its own
+    through ALLOWED_ORIGINS (comma-separated). Deliberately not "*": the API
+    accepts a bearer token, and a wildcard would let any site on the internet
+    make authenticated calls with a token it had somehow obtained.
+    """
+    extra = [
+        o.strip().rstrip("/")
+        for o in os.environ.get("ALLOWED_ORIGINS", "").split(",")
+        if o.strip()
+    ]
+    return LOCAL_ORIGINS + extra
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000", "http://127.0.0.1:3000",
-        "http://localhost:3001", "http://127.0.0.1:3001",
-    ],
+    allow_origins=allowed_origins(),
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],

@@ -216,3 +216,26 @@ def test_different_months_get_different_plans():
     assert a["horizon_start"] != b["horizon_start"]
     if a["blocks"] and b["blocks"]:
         assert a["blocks"][0]["start"][:7] != b["blocks"][0]["start"][:7]
+
+
+# --- deployment ------------------------------------------------------------
+
+
+def test_deployed_origins_come_from_the_environment(monkeypatch):
+    """A deployment's own origin is configured, not hardcoded."""
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://railvia.vercel.app,https://x.dev/")
+    from src.api.app import allowed_origins
+
+    origins = allowed_origins()
+    assert "https://railvia.vercel.app" in origins
+    assert "https://x.dev" in origins          # trailing slash stripped
+    assert "http://localhost:3000" in origins  # local dev still works
+
+
+def test_cors_is_never_a_wildcard(monkeypatch):
+    """The API accepts a bearer token. A wildcard origin would let any site
+    make authenticated calls with a token it had somehow obtained."""
+    monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
+    from src.api.app import allowed_origins
+
+    assert "*" not in allowed_origins()
