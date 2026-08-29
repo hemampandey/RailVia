@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import type { Approval, Block, Completion, Plan, StoreStatus } from "@/lib/types";
 import { blockKey } from "@/lib/types";
+import { useAuth } from "./AuthProvider";
 
 /** One provider for the whole app.
  *
@@ -43,6 +44,8 @@ export const usePlanner = () => {
 };
 
 export function PlannerProvider({ children }: { children: React.ReactNode }) {
+  const { session } = useAuth();
+  const token = session?.access_token;
   const [params, setParamsState] = useState<PlanParams>(DEFAULT_PARAMS);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [store, setStore] = useState<StoreStatus | null>(null);
@@ -73,9 +76,9 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setStore(status);
         setPlan(p);
-        if (status.connected) {
+        if (status.connected && token) {
           try {
-            const d = await getDecisions(p.instance_id);
+            const d = await getDecisions(p.instance_id, token);
             if (cancelled) return;
             setApprovals(new Map(d.approvals.map((a) => [
               `${a.section_id}@${a.start_iso}`, a,
@@ -95,7 +98,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [params, tick]);
+  }, [params, tick, token]);
 
   const setDays = useCallback((d: number) => {
     localStorage.setItem("bp-days", String(d));
@@ -112,31 +115,31 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     (b: Block) => b.tasks.every((t) => completions.has(t.id)), [completions]);
 
   const toggleApproval = useCallback(async (b: Block) => {
-    if (!plan) return;
+    if (!plan || !token) return;
     const key = blockKey(b);
     if (approvals.has(key)) {
-      await apiUnapprove(plan.instance_id, b);
+      await apiUnapprove(plan.instance_id, b, token);
       setApprovals((m) => { const n = new Map(m); n.delete(key); return n; });
     } else {
-      const rec = await apiApprove(plan.instance_id, b);
+      const rec = await apiApprove(plan.instance_id, b, token);
       setApprovals((m) => new Map(m).set(key, rec));
     }
-  }, [plan, approvals]);
+  }, [plan, approvals, token]);
 
   const toggleDone = useCallback(async (b: Block) => {
-    if (!plan) return;
+    if (!plan || !token) return;
     const currentlyDone = b.tasks.every((t) => completions.has(t.id));
     const next = new Map(completions);
     for (const t of b.tasks) {
       if (currentlyDone) {
-        await uncompleteJob(plan.instance_id, t.id);
+        await uncompleteJob(plan.instance_id, t.id, token);
         next.delete(t.id);
       } else {
-        next.set(t.id, await completeJob(plan.instance_id, t.id));
+        next.set(t.id, await completeJob(plan.instance_id, t.id, token));
       }
     }
     setCompletions(next);
-  }, [plan, completions]);
+  }, [plan, completions, token]);
 
   const value = useMemo<Ctx>(() => ({
     plan, store, approvals, completions, params, loading, error,

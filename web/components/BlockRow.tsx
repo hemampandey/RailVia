@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePlanner } from "./PlannerProvider";
+import { useAuth } from "./AuthProvider";
 import { Icon, PATH } from "./icons";
 import type { Block, Job } from "@/lib/types";
 import { DEPT_VAR } from "@/lib/types";
@@ -22,12 +23,23 @@ export function BlockRow({ block, showDate = false }: {
   const {
     plan, store, isApproved, isDone, toggleApproval, toggleDone, approvals,
   } = usePlanner();
+  const { me } = useAuth();
   const [busy, setBusy] = useState<"approve" | "done" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const approved = isApproved(block);
   const done = isDone(block);
   const connected = !!store?.connected;
+  // The head grants closures; engineers report work done. The buttons follow
+  // the same split Postgres enforces, so nobody is offered an action that
+  // will be refused.
+  const canApprove = connected && !!me?.can_approve;
+  const canComplete = connected && !!me?.can_complete;
+  const approveWhy = !connected
+    ? "Connect Supabase to record decisions"
+    : me?.can_approve
+      ? undefined
+      : "Only the divisional head can grant a closure";
   const start = new Date(block.start);
   const end = new Date(block.end);
   const sameDay = start.toDateString() === end.toDateString();
@@ -81,17 +93,17 @@ export function BlockRow({ block, showDate = false }: {
         )}
         <div className="acts">
           <button type="button" className={approved ? "on" : ""}
-            disabled={!connected || busy !== null}
+            disabled={!canApprove || busy !== null}
             aria-pressed={approved}
-            title={connected ? undefined : "Connect Supabase to record decisions"}
+            title={approveWhy}
             onClick={() => run("approve", () => toggleApproval(block))}>
             {approved && <Icon d={PATH.check} size={13} />}
             {busy === "approve" ? "…" : approved ? "Approved" : "Approve"}
           </button>
           <button type="button" className={done ? "on" : ""}
-            disabled={!connected || busy !== null}
+            disabled={!canComplete || busy !== null}
             aria-pressed={done}
-            title={connected ? undefined : "Connect Supabase to record decisions"}
+            title={canComplete ? undefined : "Connect Supabase to record decisions"}
             onClick={() => run("done", () => toggleDone(block))}>
             {done && <Icon d={PATH.check} size={13} />}
             {busy === "done" ? "…" : done ? "Done" : "Mark done"}

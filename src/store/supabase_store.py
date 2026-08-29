@@ -36,7 +36,12 @@ class SupabaseStore(Store):
     backend = "Supabase"
     shared = True
 
-    def __init__(self, url: str | None = None, key: str | None = None) -> None:
+    def __init__(
+        self,
+        url: str | None = None,
+        key: str | None = None,
+        access_token: str | None = None,
+    ) -> None:
         url = url or os.environ.get(URL_VAR)
         key = key or os.environ.get(KEY_VAR)
         if not url or not key:
@@ -49,9 +54,29 @@ class SupabaseStore(Store):
             raise SupabaseNotConfigured("supabase package not installed") from exc
 
         self.client = create_client(url, key)
+        if access_token:
+            # Act AS the signed-in user, so Postgres row-level security
+            # decides what they may do. Without this every request would run
+            # as the anonymous key and the role policies would be bypassed —
+            # the API would be enforcing its own opinion instead of the
+            # database enforcing the rule.
+            self.client.postgrest.auth(access_token)
+        self.access_token = access_token
         # Fail here rather than on the planner's first approval.
         self.client.table("approvals").select("instance_id").limit(1).execute()
-        log.info("Supabase store connected")
+        log.info("Supabase store connected (%s)",
+                 "as user" if access_token else "anonymous")
+
+    def role(self) -> str | None:
+        """The signed-in user's role, or None when not signed in.
+
+        Read from `profiles`, which RLS restricts to the caller's own row.
+        """
+        if not self.access_token:
+            return None
+        res = self.client.table("profiles").select("role").limit(1).execute()
+        rows = res.data or []
+        return rows[0]["role"] if rows else None
 
     def approve(self, approval: Approval) -> Approval:
         self.client.table("approvals").upsert(

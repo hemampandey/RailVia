@@ -11,14 +11,16 @@ from __future__ import annotations
 
 import logging
 
+from src.store.auth import AuthError, Caller, bearer, verify
 from src.store.base import Approval, Completion, Store
 from src.store.supabase_store import SupabaseNotConfigured, SupabaseStore
 
 log = logging.getLogger(__name__)
 
 __all__ = [
-    "Approval", "Completion", "Store", "SupabaseNotConfigured",
-    "SupabaseStore", "get_store", "store_status", "reset_store",
+    "Approval", "AuthError", "Caller", "Completion", "Store",
+    "SupabaseNotConfigured", "SupabaseStore", "bearer", "get_store",
+    "store_for", "store_status", "reset_store", "verify",
 ]
 
 _store: Store | None = None
@@ -41,6 +43,19 @@ def get_store() -> Store:
         _error = str(exc)
         log.warning("Supabase unavailable: %s", exc)
         raise
+
+
+def store_for(caller: Caller) -> Store:
+    """A store acting as one signed-in user.
+
+    Not cached: each user gets their own client so Postgres row-level
+    security sees the right identity. Sharing one client across users would
+    silently grant everyone the first caller's permissions.
+    """
+    from src.ingest.railradar import load_dotenv
+
+    load_dotenv()
+    return SupabaseStore(access_token=caller.token)
 
 
 def store_status() -> dict:

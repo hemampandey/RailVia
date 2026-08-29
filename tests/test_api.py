@@ -112,25 +112,36 @@ def test_store_status_is_reported_honestly():
     assert body["detail"]
 
 
-def test_decisions_refuse_rather_than_falling_back_locally():
-    """With Supabase unconfigured, writing a decision must FAIL.
+def test_decisions_require_a_signed_in_caller():
+    """Every decision endpoint refuses an anonymous request.
 
-    An approval silently recorded somewhere only one planner can see is worse
-    than a refusal, so there is deliberately no local fallback.
+    401 rather than 503: the store may be perfectly healthy — we simply do
+    not know who is asking, and a decision has to be attributable.
     """
-    from src.store import store_status
-
-    if store_status()["connected"]:
-        pytest.skip("Supabase is configured in this environment")
-
     payload = {"instance_id": "x", "section_id": "A-B", "start_iso": "2026-03-02T00:00:00"}
-    res = client.post("/api/approvals", json=payload)
-    assert res.status_code == 503
-    assert "Supabase" in res.json()["detail"]
+    assert client.post("/api/approvals", json=payload).status_code == 401
+    assert client.post(
+        "/api/completions", json={"instance_id": "x", "task_id": "T1"}
+    ).status_code == 401
+    assert client.get("/api/decisions", params={"instance_id": "x"}).status_code == 401
+    assert client.get("/api/me").status_code == 401
+    assert client.delete(
+        "/api/approvals",
+        params={"instance_id": "x", "section_id": "A", "start_iso": "t"},
+    ).status_code == 401
 
-    done = client.post("/api/completions", json={"instance_id": "x", "task_id": "T1"})
-    assert done.status_code == 503
-    assert client.get("/api/decisions", params={"instance_id": "x"}).status_code == 503
+
+def test_a_forged_token_is_rejected():
+    """A token we cannot verify is no better than no token."""
+    res = client.get("/api/me", headers={"Authorization": "Bearer not.a.jwt"})
+    assert res.status_code == 401
+
+
+def test_planning_stays_open():
+    """The plan is derived from a public timetable and simulated jobs, so it
+    is not access-controlled here. Decisions are."""
+    body = client.get("/api/plan", params={**SMALL, "time_limit": "5"})
+    assert body.status_code == 200
 
 
 def test_plan_exposes_instance_id_for_keying_decisions():

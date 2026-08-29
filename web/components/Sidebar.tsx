@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { Icon, PATH } from "./icons";
 import { ThemeToggle } from "./ThemeToggle";
 import { usePlanner } from "./PlannerProvider";
+import { useAuth } from "./AuthProvider";
+import { ROLE_LABEL } from "@/lib/types";
 
 const NAV = [
   { href: "/", label: "Calendar", icon: PATH.calendar },
@@ -16,6 +18,7 @@ const NAV = [
 export function Sidebar() {
   const path = usePathname();
   const { plan, store, approvals, completions } = usePlanner();
+  const { me, session, signOut } = useAuth();
 
   /** Counts on the nav so the sidebar says what needs attention without
    *  making anyone open each view to find out. */
@@ -55,11 +58,24 @@ export function Sidebar() {
         })}
       </nav>
       <div className="side-foot">
+        {session && (
+          <div className="who">
+            <b>{me?.email ?? session.user.email}</b>
+            <span className={"role" + (me?.role === "engineer" ? " eng" : "")}>
+              {me ? ROLE_LABEL[me.role] : "…"}
+            </span>
+          </div>
+        )}
         <span className={"store " + (store?.connected ? "on" : "off")}
           title={store?.detail ?? ""}>
           {store?.connected ? "Supabase connected" : "Supabase offline"}
         </span>
         <ThemeToggle />
+        {session && (
+          <button className="theme-btn" type="button" onClick={signOut}>
+            Sign out
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -86,3 +86,21 @@ export const DEPT_VAR: Record<Dept, string> = {
 
 export const blockKey = (b: Pick<Block, "section_id" | "start">) =>
   `${b.section_id}@${b.start}`;
+
+export type Role = "head" | "engineer";
+
+/** Who is signed in and what they may do. Supplied by the API, which reads
+ *  the role from Postgres under row-level security — never trusted from the
+ *  browser. */
+export interface Me {
+  user_id: string;
+  email: string;
+  role: Role;
+  can_approve: boolean;
+  can_complete: boolean;
+}
+
+export const ROLE_LABEL: Record<Role, string> = {
+  head: "Divisional head",
+  engineer: "Section engineer",
+};

@@ -166,28 +166,54 @@ variables. A sidebar carries the four views with live counts, the store status
 and the theme toggle. The plan is fetched once in a context provider shared by
 every route, so switching views never re-solves.
 
-### Decisions are stored in Supabase
+### Sign-in, roles, and where decisions are stored
 
-Approvals and completions are the only things this system persists —
+Two roles, matching how a division works:
+
+| Role | Can |
+|---|---|
+| **Divisional head** | Grant and withdraw closures, and report work done |
+| **Section engineer** | Report work done. Cannot grant a closure |
+
+Taking track out of service is an authority decision, not a departmental
+one — so approving is the head's alone. Both roles see the whole plan: an
+engineer needs it to know when their section is free.
+
+**This is enforced in Postgres, not in the UI.** Hiding the Approve button
+is a courtesy; the row-level-security policies in
+[`src/store/schema.sql`](src/store/schema.sql) are the control. An engineer
+who calls the REST API directly still cannot insert an approval. The API
+verifies the Supabase JWT so it knows who is asking and can attribute the
+decision, then acts *as that user* against Postgres so the database decides —
+rather than the API enforcing a second, separately-maintained opinion.
+
+Approvals and completions are the only things this system persists;
 everything else rebuilds from a seed and the cached timetable. They go to
-**Supabase and nowhere else**: there is deliberately no local fallback,
-because an approval one planner can see and another cannot is worse than
-being told the store is unreachable. Without it, planning works normally and
-the approve/complete actions are disabled with an explanation.
+**Supabase and nowhere else** — no local fallback, because an approval one
+planner can see and another cannot is worse than being told the store is
+unreachable. Without it, planning works normally and the decision actions are
+disabled with an explanation.
+
+**Setup**
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Run [`src/store/schema.sql`](src/store/schema.sql) in the SQL editor
-3. Add to `.env` (gitignored):
+3. Add the two users under Authentication → Users, then promote one to head
+   with the SQL at the bottom of that file
+4. Add to `.env` in the repo root (gitignored):
 
 ```
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
+SUPABASE_JWT_SECRET=your-jwt-secret
 ```
 
-The schema's row-level-security policies allow anonymous read and write,
-which is right for a prototype and **wrong for anything real** — a live
-deployment must scope writes to an authenticated planner so `decided_by`
-means something. That is called out in the SQL rather than left silent.
+5. Copy `web/.env.local.example` to `web/.env.local` and fill in the same
+   project URL and anon key
+
+The JWT secret is under Project Settings → API. The anon key is public by
+design — it is safe in a browser precisely because row-level security, not
+the key, is what protects the data.
 
 ### Recorded demo (stage backup)
 
@@ -218,7 +244,7 @@ src/optimiser/    CP-SAT model: windows.py (time grid, permitted windows),
 src/ml/           Criticality scoring (LightGBM) + explainability
 src/baseline/     Manual-process simulator and the before/after comparison
 src/api/          FastAPI — a pure JSON API, no server-rendered UI
-src/store/        Supabase persistence for approvals and completions
+src/store/        Supabase persistence, JWT verification, role schema
 web/              Next.js 15 front end (App Router, TypeScript)
 scripts/          CLI entry points
 tests/            pytest — constraint tests mandatory from Phase 1

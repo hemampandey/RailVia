@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/components/AuthProvider";
+import { LoginGate } from "@/components/LoginGate";
 import { PlannerProvider } from "@/components/PlannerProvider";
 import { Sidebar } from "@/components/Sidebar";
 
@@ -21,7 +23,10 @@ try {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the boot script below sets data-theme on
+    // <html> before React hydrates, so the server markup deliberately differs
+    // from the client. This is the one case React sanctions suppressing.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -30,12 +35,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <a className="skip" href="#main">Skip to content</a>
-        <PlannerProvider>
-          <div className="shell">
-            <Sidebar />
-            <main className="content" id="main">{children}</main>
-          </div>
-        </PlannerProvider>
+        <AuthProvider>
+          <LoginGate>
+            <PlannerProvider>
+              <div className="shell">
+                <Sidebar />
+                <main className="content" id="main">{children}</main>
+              </div>
+            </PlannerProvider>
+          </LoginGate>
+        </AuthProvider>
       </body>
     </html>
   );

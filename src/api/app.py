@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import functools
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -22,7 +22,10 @@ from src.ml.criticality import CriticalityModel
 from src.models import PlanningInstance
 from src.optimiser.model import BlockPlanner
 from src.optimiser.windows import TimeGrid
-from src.store import Approval, Completion, get_store, store_status
+from src.store import (
+    Approval, AuthError, Caller, Completion, bearer, get_store, store_for,
+    store_status, verify,
+)
 
 app = FastAPI(
     title="Automatic Block Planning (SIH26027)",
@@ -271,9 +274,18 @@ class CompletionIn(BaseModel):
     note: str = ""
 
 
-def _require_store():
+def _caller(authorization: str | None) -> Caller:
+    """Who is making this request. 401 if we cannot say."""
     try:
-        return get_store()
+        return verify(bearer(authorization))
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+def _store_as(caller: Caller):
+    """A store scoped to the caller, so Postgres RLS applies to them."""
+    try:
+        return store_for(caller)
     except Exception as exc:  # noqa: BLE001
         # 503, not 500: the request was fine, the store is not reachable.
         # Never silently record the decision somewhere else.
@@ -283,14 +295,46 @@ def _require_store():
         ) from exc
 
 
+def _forbidden(exc: Exception) -> HTTPException:
+    """Translate an RLS refusal into something a person can act on.
+
+    Postgres rejects the write; we do not re-check the role here, because two
+    places deciding the same thing is two places to disagree.
+    """
+    text = str(exc)
+    if "row-level security" in text or "42501" in text or "violates" in text:
+        return HTTPException(
+            status_code=403,
+            detail="Only the divisional head can grant or withdraw a closure.",
+        )
+    return HTTPException(status_code=502, detail=f"Supabase rejected the write: {text}")
+
+
 @app.get("/api/store")
 def store_state() -> dict:
     return store_status()
 
 
+@app.get("/api/me")
+def me(authorization: str | None = Header(default=None)) -> dict:
+    """Who is signed in, and what they are allowed to do."""
+    caller = _caller(authorization)
+    store = _store_as(caller)
+    role = store.role() or "engineer"
+    return {
+        "user_id": caller.user_id,
+        "email": caller.email,
+        "role": role,
+        "can_approve": role == "head",
+        "can_complete": True,
+    }
+
+
 @app.get("/api/decisions")
-def decisions(instance_id: str) -> dict:
-    store = _require_store()
+def decisions(
+    instance_id: str, authorization: str | None = Header(default=None)
+) -> dict:
+    store = _store_as(_caller(authorization))
     return {
         "approvals": [a.model_dump() for a in store.approvals(instance_id)],
         "completions": [c.model_dump() for c in store.completions(instance_id)],
@@ -298,28 +342,54 @@ def decisions(instance_id: str) -> dict:
 
 
 @app.post("/api/approvals")
-def add_approval(body: ApprovalIn) -> dict:
-    store = _require_store()
-    return store.approve(Approval(**body.model_dump())).model_dump()
+def add_approval(
+    body: ApprovalIn, authorization: str | None = Header(default=None)
+) -> dict:
+    caller = _caller(authorization)
+    store = _store_as(caller)
+    record = Approval(**{**body.model_dump(), "decided_by": caller.label})
+    try:
+        return store.approve(record).model_dump()
+    except Exception as exc:  # noqa: BLE001
+        raise _forbidden(exc) from exc
 
 
 @app.delete("/api/approvals")
 def remove_approval(
-    instance_id: str, section_id: str, start_iso: str
+    instance_id: str, section_id: str, start_iso: str,
+    authorization: str | None = Header(default=None),
 ) -> dict:
-    _require_store().unapprove(instance_id, section_id, start_iso)
+    store = _store_as(_caller(authorization))
+    try:
+        store.unapprove(instance_id, section_id, start_iso)
+    except Exception as exc:  # noqa: BLE001
+        raise _forbidden(exc) from exc
     return {"removed": True}
 
 
 @app.post("/api/completions")
-def add_completion(body: CompletionIn) -> dict:
-    store = _require_store()
-    return store.complete(Completion(**body.model_dump())).model_dump()
+def add_completion(
+    body: CompletionIn, authorization: str | None = Header(default=None)
+) -> dict:
+    caller = _caller(authorization)
+    store = _store_as(caller)
+    record = Completion(**{**body.model_dump(), "completed_by": caller.label})
+    try:
+        return store.complete(record).model_dump()
+    except Exception as exc:  # noqa: BLE001
+        raise _forbidden(exc) from exc
 
 
 @app.delete("/api/completions")
-def remove_completion(instance_id: str, task_id: str) -> dict:
-    _require_store().uncomplete(instance_id, task_id)
+def remove_completion(
+    instance_id: str, task_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    store = _store_as(_caller(authorization))
+    try:
+        store.uncomplete(instance_id, task_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _forbidden(exc) from exc
     return {"removed": True}
 
 

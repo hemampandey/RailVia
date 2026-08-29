@@ -1,5 +1,5 @@
 import type {
-  Approval, Block, Completion, Plan, StoreStatus,
+  Approval, Block, Completion, Me, Plan, StoreStatus,
 } from "./types";
 
 /** Planning parameters. Kept in one place so every view asks for the same
@@ -31,6 +31,12 @@ const qs = (p: PlanParams) =>
     time_limit: String(p.timeLimit),
   }).toString();
 
+/** Attach the caller's Supabase access token. The API verifies it and then
+ *  acts as that user against Postgres, so row-level security decides what
+ *  they may do. */
+const auth = (token?: string): HeadersInit =>
+  token ? { Authorization: `Bearer ${token}` } : {};
+
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
@@ -50,39 +56,43 @@ export const getPlan = (p: PlanParams) =>
 
 export const getStore = () => json<StoreStatus>(`${API_ORIGIN}/api/store`);
 
-export const getDecisions = (instanceId: string) =>
+export const getMe = (token: string) =>
+  json<Me>(`${API_ORIGIN}/api/me`, { headers: auth(token) });
+
+export const getDecisions = (instanceId: string, token: string) =>
   json<{ approvals: Approval[]; completions: Completion[] }>(
     `${API_ORIGIN}/api/decisions?instance_id=${encodeURIComponent(instanceId)}`,
+    { headers: auth(token) },
   );
 
-export const approve = (instanceId: string, b: Block) =>
+export const approve = (instanceId: string, b: Block, token: string) =>
   json<Approval>(`${API_ORIGIN}/api/approvals`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...auth(token) },
     body: JSON.stringify({
       instance_id: instanceId, section_id: b.section_id, start_iso: b.start,
     }),
   });
 
-export const unapprove = (instanceId: string, b: Block) =>
+export const unapprove = (instanceId: string, b: Block, token: string) =>
   json<{ removed: boolean }>(
     `${API_ORIGIN}/api/approvals?${new URLSearchParams({
       instance_id: instanceId, section_id: b.section_id, start_iso: b.start,
     })}`,
-    { method: "DELETE" },
+    { method: "DELETE", headers: auth(token) },
   );
 
-export const completeJob = (instanceId: string, taskId: string) =>
+export const completeJob = (instanceId: string, taskId: string, token: string) =>
   json<Completion>(`${API_ORIGIN}/api/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...auth(token) },
     body: JSON.stringify({ instance_id: instanceId, task_id: taskId }),
   });
 
-export const uncompleteJob = (instanceId: string, taskId: string) =>
+export const uncompleteJob = (instanceId: string, taskId: string, token: string) =>
   json<{ removed: boolean }>(
     `${API_ORIGIN}/api/completions?${new URLSearchParams({
       instance_id: instanceId, task_id: taskId,
     })}`,
-    { method: "DELETE" },
+    { method: "DELETE", headers: auth(token) },
   );
