@@ -148,11 +148,32 @@ is open to planned work (default: quietest 25%).
 ```
 
 Then open <http://localhost:8077>. Four views: block plan (Gantt, coloured by
-department, shared blocks highlighted), before/after, criticality with
-per-task explanations, and section traffic profiles. No build step and no CDN
-— the page is plain JS and hand-drawn SVG, so the demo cannot fail because of
-a network. That is a deliberate departure from the brief's "React + Gantt
-library"; the trade-off is discussed below.
+department, shared blocks hatched), before/after, criticality with per-task
+explanations, and section traffic profiles.
+
+Built on a Data-Dense Dashboard system: light and dark themes from one set of
+semantic tokens, Fira Sans/Fira Code with tabular figures so numbers do not
+jitter between solves, and a 4px spacing rhythm.
+
+Accessibility was verified in the browser, not assumed:
+
+- Contrast measured in both themes — 6.3:1 to 16.6:1 light, 7.4:1 to 16.5:1
+  dark, against a 4.5:1 requirement.
+- Every control is at least 44x44px; tabs follow the WAI-ARIA pattern with
+  arrow-key navigation and roving `tabindex`.
+- Skip link, visible focus rings, `aria-live` status, and
+  `prefers-reduced-motion` honoured.
+- **Nothing depends on colour alone.** Shared blocks are hatched as well as
+  coloured; at the 30-day view bars are only 3-4px wide, so department
+  identity is carried by the tooltip and by the full block table rendered
+  beneath every Gantt — which is also what a screen reader reads, since an
+  SVG chart is not content.
+
+No build step and no JS dependencies, so the demo cannot fail because of a
+network. Fonts come from Google with `font-display:swap` behind a full system
+fallback: offline the page is typographically plain but entirely functional.
+That is a deliberate departure from the brief's "React + Gantt library"; the
+trade-off is discussed below.
 
 ### Recorded demo (stage backup)
 
@@ -218,7 +239,8 @@ Three, each forced by measurement rather than preference:
    simple", and a demo that cannot be broken by a slow CDN or hostile venue
    wifi was worth more than the framework. Everything asked for is there:
    department colour-coding, shared-block highlighting, weekly/monthly
-   toggle, KPI dashboard, before/after view.
+   toggle, KPI dashboard, before/after view — plus light/dark theming and a
+   measured accessibility pass.
 
 ## Honest limitations
 

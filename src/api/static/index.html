@@ -3,98 +3,333 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Automatic Block Planning — SIH26027</title>
+<title>Block Planner — SIH26027</title>
+<!--
+  Fonts load from Google with font-display:swap behind a full system fallback.
+  If the venue network is down the page is typographically plain but entirely
+  functional — unlike a framework CDN, where failure means a blank screen.
+  Everything else here is local: no JS dependencies at all.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg:#0f1419; --panel:#161c24; --panel2:#1d2530; --line:#2a3441;
-    --ink:#e6edf3; --muted:#8b97a6; --accent:#4a9eff;
-    --engg:#e8833a; --trd:#7c5cd6; --snt:#2eb88a; --shared:#f0c040;
-    --bad:#e05252; --good:#2eb88a;
+/* ── Tokens ─────────────────────────────────────────────────────────────
+   Semantic names only; no raw hex below this block. Light is the base,
+   dark is a tonal re-map rather than an inversion.                      */
+:root {
+  --bg:#f4f7fb; --surface:#ffffff; --surface-2:#eef3f9; --surface-3:#e3ebf5;
+  --border:#c9d6e6; --border-soft:#dde6f1;
+  --text:#0f172a; --text-muted:#415064; --text-faint:#51617a;
+  --primary:#1e40af; --primary-soft:#e5edff; --on-primary:#ffffff;
+  --accent:#b45309; --accent-soft:#fdf0dd;
+  --good:#0f7a5a; --good-soft:#dff5ed;
+  --bad:#c2261d; --bad-soft:#fde8e6;
+  --engg:#b45309; --trd:#6d28d9; --snt:#0f766e; --shared:#a16207;
+  --shadow:0 1px 2px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.08);
+  --shadow-lg:0 4px 6px rgba(15,23,42,.05), 0 10px 20px rgba(15,23,42,.10);
+  --radius:8px; --radius-sm:5px;
+  /* Dense dashboard rhythm: 4px base */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --font-sans:"Fira Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"Fira Code",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+:root[data-theme="dark"] {
+  --bg:#0a1020; --surface:#111a2b; --surface-2:#182337; --surface-3:#1f2d45;
+  --border:#2c3d57; --border-soft:#223148;
+  --text:#e9f0fa; --text-muted:#aebdd2; --text-faint:#9aabc2;
+  --primary:#7aa8ff; --primary-soft:#17233d; --on-primary:#0a1020;
+  --accent:#f0a336; --accent-soft:#2e2312;
+  --good:#4ecfa4; --good-soft:#10291f;
+  --bad:#ff7a6e; --bad-soft:#2e1614;
+  --engg:#f0a336; --trd:#a78bfa; --snt:#3fc7a8; --shared:#facc15;
+  --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-lg:0 10px 24px rgba(0,0,0,.5);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) {
+    --bg:#0a1020; --surface:#111a2b; --surface-2:#182337; --surface-3:#1f2d45;
+    --border:#2c3d57; --border-soft:#223148;
+    --text:#e9f0fa; --text-muted:#aebdd2; --text-faint:#9aabc2;
+    --primary:#7aa8ff; --primary-soft:#17233d; --on-primary:#0a1020;
+    --accent:#f0a336; --accent-soft:#2e2312;
+    --good:#4ecfa4; --good-soft:#10291f;
+    --bad:#ff7a6e; --bad-soft:#2e1614;
+    --engg:#f0a336; --trd:#a78bfa; --snt:#3fc7a8; --shared:#facc15;
+    --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-lg:0 10px 24px rgba(0,0,0,.5);
   }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-  header { padding:18px 24px; border-bottom:1px solid var(--line); background:var(--panel); }
-  h1 { margin:0 0 4px; font-size:19px; font-weight:650; letter-spacing:-.01em; }
-  .prov { font-size:12px; color:var(--muted); }
-  .prov b { color:var(--good); font-weight:600; }
-  .prov i { color:var(--shared); font-style:normal; font-weight:600; }
-  main { padding:20px 24px 60px; max-width:1500px; }
-  .controls { display:flex; gap:14px; align-items:end; flex-wrap:wrap; margin-bottom:20px; }
-  label { display:block; font-size:11px; text-transform:uppercase;
-    letter-spacing:.06em; color:var(--muted); margin-bottom:5px; }
-  select, button { background:var(--panel2); color:var(--ink);
-    border:1px solid var(--line); border-radius:6px; padding:7px 11px; font-size:13px; }
-  button { cursor:pointer; border-color:var(--accent); color:var(--accent); font-weight:600; }
-  button:hover:not(:disabled) { background:var(--accent); color:#08101a; }
-  button:disabled { opacity:.5; cursor:default; }
-  .tabs { display:flex; gap:2px; margin-bottom:18px; border-bottom:1px solid var(--line); }
-  .tab { padding:9px 16px; cursor:pointer; color:var(--muted); font-size:13px;
-    border-bottom:2px solid transparent; }
-  .tab.on { color:var(--ink); border-bottom-color:var(--accent); }
-  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr));
-    gap:12px; margin-bottom:22px; }
-  .kpi { background:var(--panel); border:1px solid var(--line);
-    border-radius:9px; padding:14px 16px; }
-  .kpi .v { font-size:25px; font-weight:660; letter-spacing:-.02em; }
-  .kpi .l { font-size:11px; color:var(--muted); text-transform:uppercase;
-    letter-spacing:.05em; margin-top:3px; }
-  .kpi .s { font-size:11px; color:var(--muted); margin-top:5px; }
-  .panel { background:var(--panel); border:1px solid var(--line);
-    border-radius:9px; padding:16px; margin-bottom:18px; }
-  .panel h2 { margin:0 0 12px; font-size:14px; font-weight:620; }
-  .panel h2 span { font-weight:400; color:var(--muted); font-size:12px; }
-  .scroll { overflow-x:auto; }
-  table { border-collapse:collapse; width:100%; font-size:13px; }
-  th,td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); }
-  th { color:var(--muted); font-weight:600; font-size:11px;
-    text-transform:uppercase; letter-spacing:.05em; }
-  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
-  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px;
-    color:var(--muted); margin-bottom:10px; }
-  .sw { display:inline-block; width:11px; height:11px; border-radius:3px;
-    margin-right:5px; vertical-align:-1px; }
-  .loading { color:var(--muted); padding:30px; text-align:center; }
-  .err { color:var(--bad); padding:14px; }
-  .bar { height:7px; background:var(--panel2); border-radius:4px; overflow:hidden; }
-  .bar > i { display:block; height:100%; background:var(--accent); }
-  .hide { display:none; }
-  .tip { position:fixed; background:#0a0e13; border:1px solid var(--line);
-    border-radius:7px; padding:9px 11px; font-size:12px; pointer-events:none;
-    z-index:50; max-width:330px; box-shadow:0 8px 24px rgba(0,0,0,.5); }
-  .win { font-size:11px; color:var(--muted); }
+}
+
+*{box-sizing:border-box;}
+html{color-scheme:light dark;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font:15px/1.55 var(--font-sans); -webkit-font-smoothing:antialiased;
+}
+/* Data must never jitter as it updates. */
+.num,td.num,th.num,.kpi-v,tbody td{font-variant-numeric:tabular-nums;}
+
+/* ── Focus: visible everywhere, never removed ───────────────────────── */
+:where(a,button,select,[tabindex],[role="tab"]):focus-visible{
+  outline:2px solid var(--primary); outline-offset:2px; border-radius:var(--radius-sm);
+}
+.skip{
+  position:absolute; left:var(--s3); top:-48px; z-index:100;
+  background:var(--primary); color:var(--on-primary);
+  padding:var(--s2) var(--s4); border-radius:var(--radius-sm);
+  transition:top .15s ease-out;
+}
+.skip:focus{top:var(--s3);}
+
+/* ── Shell ──────────────────────────────────────────────────────────── */
+header{
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:var(--s4) var(--s5); position:sticky; top:0; z-index:20;
+}
+.head-row{display:flex; align-items:flex-start; gap:var(--s4);}
+.head-row > :first-child{flex:1 1 auto; min-width:0;}
+h1{
+  margin:0; font-size:17px; font-weight:700; letter-spacing:-.01em;
+  display:flex; align-items:center; gap:var(--s2);
+}
+h1 .mark{
+  width:22px; height:22px; border-radius:5px; background:var(--primary);
+  color:var(--on-primary); display:grid; place-items:center; flex:none;
+}
+.sub{font-size:12.5px; color:var(--text-muted); margin-top:var(--s1);}
+.prov{
+  margin-top:var(--s2); display:flex; gap:var(--s1) var(--s3);
+  flex-wrap:wrap; font-size:11.5px; align-items:center;
+}
+.chip{
+  display:inline-flex; align-items:center; gap:5px; padding:2px var(--s2);
+  border-radius:999px; border:1px solid var(--border-soft);
+  background:var(--surface-2); color:var(--text-muted);
+  font-family:var(--font-mono); font-size:11px;
+}
+.chip.real{background:var(--good-soft); border-color:transparent; color:var(--good); font-weight:600;}
+.chip.syn{background:var(--accent-soft); border-color:transparent; color:var(--accent); font-weight:600;}
+.btn-icon{margin-left:auto; flex:none;}
+
+main{padding:var(--s5); max-width:1560px; margin:0 auto;}
+
+/* ── Controls ───────────────────────────────────────────────────────── */
+.controls{
+  display:flex; gap:var(--s3); align-items:end; flex-wrap:wrap;
+  margin-bottom:var(--s5); padding:var(--s3) var(--s4);
+  background:var(--surface); border:1px solid var(--border-soft);
+  border-radius:var(--radius); box-shadow:var(--shadow);
+}
+.field{display:flex; flex-direction:column; gap:5px; min-width:132px;}
+label{
+  font-size:10.5px; font-weight:600; text-transform:uppercase;
+  letter-spacing:.07em; color:var(--text-faint);
+}
+select,button{
+  font:inherit; font-size:13.5px; border-radius:var(--radius-sm);
+  border:1px solid var(--border); background:var(--surface-2);
+  color:var(--text); padding:8px 10px; min-height:44px;
+  /* Deliberately NOT transitioning `color`. A running colour transition pins
+     the resolved value of a custom property, so theme-switching left tabs on
+     the previous theme's ink. Themes should snap anyway — a piecemeal
+     cross-fade of half the page reads as a rendering fault. */
+  transition:background-color .15s ease-out, border-color .15s ease-out;
+}
+select{cursor:pointer; width:100%;}
+select:hover,button:hover:not(:disabled){border-color:var(--primary);}
+.btn-primary{
+  background:var(--primary); color:var(--on-primary);
+  border-color:var(--primary); font-weight:600; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; padding:7px 14px;
+}
+.btn-primary:hover:not(:disabled){filter:brightness(1.1);}
+.btn-icon{
+  cursor:pointer; display:inline-grid; place-items:center;
+  width:44px; height:44px; padding:0; background:var(--surface-2);
+}
+button:disabled{opacity:.45; cursor:not-allowed;}
+
+/* ── Tabs ───────────────────────────────────────────────────────────── */
+[role="tablist"]{
+  display:flex; gap:var(--s1); margin-bottom:var(--s5);
+  border-bottom:1px solid var(--border); overflow-x:auto;
+}
+[role="tab"]{
+  appearance:none; background:none; border:none; border-bottom:2px solid transparent;
+  padding:var(--s3) var(--s4); font-size:13.5px; font-weight:500;
+  color:var(--text-muted); cursor:pointer; white-space:nowrap;
+  min-height:44px; border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+}
+[role="tab"]:hover{color:var(--text); background:var(--surface-2);}
+[role="tab"][aria-selected="true"]{
+  color:var(--primary); border-bottom-color:var(--primary); font-weight:600;
+}
+
+/* ── KPI cards ──────────────────────────────────────────────────────── */
+.kpis{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:var(--s3); margin-bottom:var(--s5);
+}
+.kpi{
+  background:var(--surface); border:1px solid var(--border-soft);
+  border-radius:var(--radius); padding:var(--s4);
+  box-shadow:var(--shadow); border-left:3px solid var(--border);
+}
+.kpi.good{border-left-color:var(--good);}
+.kpi.bad{border-left-color:var(--bad);}
+.kpi.hero{border-left-color:var(--primary);}
+.kpi-v{font-size:27px; font-weight:700; letter-spacing:-.025em; line-height:1.15;}
+.kpi-l{
+  font-size:10.5px; font-weight:600; color:var(--text-faint);
+  text-transform:uppercase; letter-spacing:.06em; margin-top:var(--s1);
+}
+.kpi-s{font-size:11.5px; color:var(--text-muted); margin-top:5px;}
+
+/* ── Panels & tables ────────────────────────────────────────────────── */
+.panel{
+  background:var(--surface); border:1px solid var(--border-soft);
+  border-radius:var(--radius); padding:var(--s4);
+  margin-bottom:var(--s4); box-shadow:var(--shadow);
+}
+.panel h2{
+  margin:0 0 var(--s3); font-size:14px; font-weight:650;
+  display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap;
+}
+.panel h2 .muted{font-weight:400; color:var(--text-muted); font-size:12.5px;}
+.note{
+  font-size:12.5px; color:var(--text-muted); margin-bottom:var(--s3);
+  line-height:1.6; max-width:78ch;
+}
+.note b{color:var(--text); font-weight:600;}
+.scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+table{border-collapse:collapse; width:100%; font-size:13px;}
+th,td{text-align:left; padding:7px var(--s3); border-bottom:1px solid var(--border-soft);}
+th{
+  color:var(--text-faint); font-weight:600; font-size:10.5px;
+  text-transform:uppercase; letter-spacing:.05em; white-space:nowrap;
+  position:sticky; top:0; background:var(--surface);
+}
+td.num,th.num{text-align:right;}
+tbody tr:hover{background:var(--surface-2);}
+tr.click{cursor:pointer;}
+tr.click:focus-visible{outline:2px solid var(--primary); outline-offset:-2px;}
+.mono{font-family:var(--font-mono); font-size:12.5px;}
+
+/* ── Legend & Gantt ─────────────────────────────────────────────────── */
+.legend{
+  display:flex; gap:var(--s4); flex-wrap:wrap; font-size:12px;
+  color:var(--text-muted); margin-bottom:var(--s3); align-items:center;
+}
+.legend span{display:inline-flex; align-items:center; gap:6px;}
+.sw{width:11px; height:11px; border-radius:3px; flex:none;}
+.bar{height:6px; background:var(--surface-3); border-radius:3px; overflow:hidden;}
+.bar>i{display:block; height:100%; background:var(--primary); border-radius:3px;}
+
+/* ── Loading skeleton ───────────────────────────────────────────────── */
+.sk{background:var(--surface-3); border-radius:var(--radius-sm); animation:pulse 1.4s ease-in-out infinite;}
+.sk-kpi{height:92px;}
+.sk-panel{height:260px; margin-top:var(--s3);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+.status{font-size:13px; color:var(--text-muted); margin-bottom:var(--s3);
+  display:flex; align-items:center; gap:var(--s2);}
+.spin{
+  width:14px; height:14px; border:2px solid var(--border);
+  border-top-color:var(--primary); border-radius:50%;
+  animation:spin .7s linear infinite; flex:none;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.err{
+  color:var(--bad); background:var(--bad-soft); padding:var(--s4);
+  border-radius:var(--radius); border:1px solid transparent;
+}
+
+/* ── Tooltip ────────────────────────────────────────────────────────── */
+.tip{
+  position:fixed; background:var(--surface); color:var(--text);
+  border:1px solid var(--border); border-radius:var(--radius);
+  padding:var(--s3); font-size:12.5px; pointer-events:none; z-index:60;
+  max-width:340px; box-shadow:var(--shadow-lg); line-height:1.5;
+}
+.tip b{font-weight:650;}
+.vh{
+  position:absolute; width:1px; height:1px; overflow:hidden;
+  clip:rect(0 0 0 0); white-space:nowrap;
+}
+
+@media (max-width:720px){
+  main,header{padding:var(--s4);}
+  .kpi-v{font-size:23px;}
+  .controls{gap:var(--s2);}
+  .field{flex:1 1 128px;}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important; animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+}
 </style>
 </head>
 <body>
+<a class="skip" href="#view">Skip to content</a>
 <header>
-  <h1>Automatic Block Planning · SIH26027</h1>
-  <div class="prov" id="prov">loading…</div>
+  <div class="head-row">
+    <div>
+      <h1>
+        <span class="mark" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        </span>
+        Automatic Block Planning
+      </h1>
+      <div class="sub">SIH26027 · Ministry of Railways · coordinated maintenance scheduling</div>
+      <div class="prov" id="prov"><span class="chip">loading…</span></div>
+    </div>
+    <button class="btn-icon" id="theme" type="button" aria-label="Switch colour theme">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </div>
 </header>
+
 <main>
   <div class="controls">
-    <div><label>Horizon</label><select id="days">
-      <option value="7">Weekly (7 days)</option>
-      <option value="30" selected>Monthly (30 days)</option></select></div>
-    <div><label>Backlog size</label><select id="tasks">
-      <option value="60">60 tasks</option><option value="120" selected>120 tasks</option>
-      <option value="300">300 tasks</option></select></div>
-    <div><label>Data</label><select id="grounded">
-      <option value="true" selected>Real timetable</option>
-      <option value="false">Fully synthetic</option></select></div>
-    <div><label>Solver budget</label><select id="tl">
-      <option value="15">15 s</option><option value="30" selected>30 s</option>
-      <option value="60">60 s</option></select></div>
-    <button id="go">Re-plan</button>
+    <div class="field"><label for="days">Horizon</label>
+      <select id="days"><option value="7">Weekly · 7 days</option>
+        <option value="30" selected>Monthly · 30 days</option></select></div>
+    <div class="field"><label for="tasks">Backlog</label>
+      <select id="tasks"><option value="60">60 tasks</option>
+        <option value="120" selected>120 tasks</option>
+        <option value="300">300 tasks</option></select></div>
+    <div class="field"><label for="grounded">Data source</label>
+      <select id="grounded"><option value="true" selected>Real timetable</option>
+        <option value="false">Fully synthetic</option></select></div>
+    <div class="field"><label for="tl">Solver budget</label>
+      <select id="tl"><option value="15">15 seconds</option>
+        <option value="30" selected>30 seconds</option>
+        <option value="60">60 seconds</option></select></div>
+    <div class="field"><label aria-hidden="true">&nbsp;</label>
+      <button class="btn-primary" id="go" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/></svg>
+        Re-plan
+      </button></div>
   </div>
 
-  <div class="tabs">
-    <div class="tab on" data-v="plan">Block plan</div>
-    <div class="tab" data-v="compare">Before / after</div>
-    <div class="tab" data-v="ml">Criticality</div>
-    <div class="tab" data-v="sections">Sections</div>
+  <div role="tablist" aria-label="Views">
+    <button role="tab" id="tab-plan" aria-controls="view" aria-selected="true"
+            data-v="plan" type="button">Block plan</button>
+    <button role="tab" id="tab-compare" aria-controls="view" aria-selected="false"
+            data-v="compare" tabindex="-1" type="button">Before / after</button>
+    <button role="tab" id="tab-ml" aria-controls="view" aria-selected="false"
+            data-v="ml" tabindex="-1" type="button">Criticality</button>
+    <button role="tab" id="tab-sections" aria-controls="view" aria-selected="false"
+            data-v="sections" tabindex="-1" type="button">Sections</button>
   </div>
 
-  <div id="view"><div class="loading">Loading…</div></div>
+  <div id="view" role="tabpanel" tabindex="-1" aria-labelledby="tab-plan"></div>
+  <p aria-live="polite" class="vh" id="live"></p>
 </main>
 <script src="/static/app.js"></script>
 </body>
