@@ -92,3 +92,40 @@ def test_index_page_served():
     page = client.get("/")
     assert page.status_code == 200
     assert "Block Planner" in page.text
+
+
+# --- decisions: approvals and completions ----------------------------------
+
+
+def test_store_status_is_reported_honestly():
+    """The UI must be able to say plainly whether decisions can be recorded."""
+    body = client.get("/api/store").json()
+    assert body["backend"] == "Supabase"
+    assert isinstance(body["connected"], bool)
+    assert body["detail"]
+
+
+def test_decisions_refuse_rather_than_falling_back_locally():
+    """With Supabase unconfigured, writing a decision must FAIL.
+
+    An approval silently recorded somewhere only one planner can see is worse
+    than a refusal, so there is deliberately no local fallback.
+    """
+    from src.store import store_status
+
+    if store_status()["connected"]:
+        pytest.skip("Supabase is configured in this environment")
+
+    payload = {"instance_id": "x", "section_id": "A-B", "start_iso": "2026-03-02T00:00:00"}
+    res = client.post("/api/approvals", json=payload)
+    assert res.status_code == 503
+    assert "Supabase" in res.json()["detail"]
+
+    done = client.post("/api/completions", json={"instance_id": "x", "task_id": "T1"})
+    assert done.status_code == 503
+    assert client.get("/api/decisions", params={"instance_id": "x"}).status_code == 503
+
+
+def test_plan_exposes_instance_id_for_keying_decisions():
+    body = client.get("/api/plan", params={**SMALL, "time_limit": "5"}).json()
+    assert body["instance_id"]

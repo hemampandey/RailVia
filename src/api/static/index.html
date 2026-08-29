@@ -73,7 +73,53 @@ button:hover:not(:disabled),select:hover{border-color:var(--primary)}
 button:disabled{opacity:.45;cursor:not-allowed}
 .icon-btn{width:44px;padding:0;display:inline-grid;place-items:center;flex:none}
 
-main{padding:var(--s5);max-width:1080px;margin:0 auto}
+main{padding:var(--s5);max-width:1120px;margin:0 auto}
+
+/* ── tabs ─────────────────────────────────────────────────────────── */
+nav[role="tablist"]{display:flex;gap:2px;background:var(--surface);
+  border-bottom:1px solid var(--border);padding:0 var(--s5);overflow-x:auto}
+nav[role="tab"],nav[role="tablist"] button{appearance:none;background:none;
+  border:none;border-bottom:2px solid transparent;border-radius:0;
+  padding:var(--s3) var(--s4);font-size:13.5px;font-weight:500;
+  color:var(--text-muted);cursor:pointer;white-space:nowrap;min-height:46px}
+nav[role="tablist"] button:hover{color:var(--text);background:var(--surface-2)}
+nav[role="tablist"] button[aria-selected="true"]{color:var(--primary);
+  border-bottom-color:var(--primary);font-weight:650}
+.store{font-size:11px;font-family:var(--font-mono);padding:3px 9px;
+  border-radius:999px;white-space:nowrap}
+.store.on{background:var(--good-soft);color:var(--good)}
+.store.off{background:var(--bad-soft);color:var(--bad)}
+
+/* ── calendar ─────────────────────────────────────────────────────── */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--s2)}
+.cal .dow{font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text-faint);text-align:center;
+  padding-bottom:var(--s1)}
+.cell{background:var(--surface);border:1px solid var(--border-soft);
+  border-radius:var(--radius-sm);padding:var(--s2);min-height:92px;
+  display:flex;flex-direction:column;gap:5px;cursor:pointer;text-align:left;
+  font:inherit;color:inherit}
+.cell:hover{border-color:var(--primary)}
+.cell[aria-pressed="true"]{border-color:var(--primary);
+  box-shadow:0 0 0 1px var(--primary) inset}
+.cell.empty{background:transparent;border-style:dashed;cursor:default;opacity:.5}
+.cell .d{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.cell .n{font-size:11px;color:var(--text-muted)}
+.cell .dots{display:flex;gap:3px;flex-wrap:wrap;margin-top:auto}
+.cell .dots i{width:6px;height:6px;border-radius:2px;display:block}
+.cell .th{font-size:11px;font-variant-numeric:tabular-nums;color:var(--text-faint)}
+.cell.busy{background:var(--primary-soft)}
+@media (max-width:700px){.cal{grid-template-columns:repeat(7,1fr);gap:3px}
+  .cell{min-height:64px;padding:4px}.cell .n,.cell .th{display:none}}
+
+.setup{background:var(--accent-soft);border:1px solid var(--accent);
+  border-radius:var(--radius);padding:var(--s4);margin-bottom:var(--s4)}
+.setup h3{margin:0 0 var(--s2);font-size:14px;color:var(--accent)}
+.setup pre{background:var(--surface);border:1px solid var(--border-soft);
+  border-radius:var(--radius-sm);padding:var(--s3);overflow-x:auto;
+  font-family:var(--font-mono);font-size:12px;margin:var(--s2) 0}
+.empty-state{text-align:center;padding:var(--s6) var(--s4);color:var(--text-muted)}
+.empty-state b{display:block;font-size:15px;color:var(--text);margin-bottom:6px}
 
 /* ── The decision bar: what am I looking at, what needs me ─────────── */
 .brief{background:var(--surface);border:1px solid var(--border-soft);
@@ -193,6 +239,7 @@ td.num,th.num{text-align:right}
         <path d="M4 6h16M4 12h16M4 18h10"/></svg></span>Block Planner</h1>
       <div class="sub">Divisional maintenance blocks · SIH26027</div>
     </div>
+    <span class="store" id="store" title="Where decisions are recorded"></span>
     <button class="icon-btn" id="theme" type="button" aria-label="Switch colour theme">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -200,8 +247,14 @@ td.num,th.num{text-align:right}
     </button>
   </div>
 </header>
+<nav role="tablist" aria-label="Views" id="tabs">
+  <button role="tab" id="tab-calendar" data-v="calendar" aria-selected="true" type="button">Calendar</button>
+  <button role="tab" id="tab-plan" data-v="plan" aria-selected="false" tabindex="-1" type="button">Plan</button>
+  <button role="tab" id="tab-approved" data-v="approved" aria-selected="false" tabindex="-1" type="button">Approved</button>
+  <button role="tab" id="tab-done" data-v="done" aria-selected="false" tabindex="-1" type="button">Completed</button>
+</nav>
 <main id="work">
-  <div id="view"></div>
+  <div id="view" role="tabpanel" tabindex="-1" aria-labelledby="tab-calendar"></div>
   <p aria-live="polite" class="vh" id="live"></p>
 </main>
 <script src="/static/app.js"></script>

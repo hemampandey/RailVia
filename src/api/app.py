@@ -10,9 +10,10 @@ from __future__ import annotations
 import functools
 import pathlib
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from src.adapters import GroundedTimetableSource, SyntheticDataSource
 from src.baseline.compare import run_comparison
@@ -20,6 +21,7 @@ from src.ml.criticality import CriticalityModel
 from src.models import PlanningInstance
 from src.optimiser.model import BlockPlanner
 from src.optimiser.windows import TimeGrid
+from src.store import Approval, Completion, get_store, store_status
 
 STATIC_DIR = pathlib.Path(__file__).resolve().parent / "static"
 
@@ -186,6 +188,7 @@ def plan(
     exceptions.sort(key=lambda e: (-e["criticality"], e["due"]))
 
     return {
+        "instance_id": instance.instance_id,
         "status": solution.status,
         "wall_time": round(solution.wall_time, 2),
         "train_hours_lost": solution.train_hours_lost,
@@ -229,6 +232,79 @@ def comparison(
             result.planned_full.scheduled_count - result.baseline.scheduled_count
         ),
     }
+
+
+# ── decisions: approvals and completions ────────────────────────────────
+#
+# These are the only things this system persists. Everything else is
+# reproducible from a seed and the cached timetable.
+
+
+class ApprovalIn(BaseModel):
+    instance_id: str
+    section_id: str
+    start_iso: str
+    decided_by: str = "demo-planner"
+    note: str = ""
+
+
+class CompletionIn(BaseModel):
+    instance_id: str
+    task_id: str
+    completed_by: str = "demo-planner"
+    note: str = ""
+
+
+def _require_store():
+    try:
+        return get_store()
+    except Exception as exc:  # noqa: BLE001
+        # 503, not 500: the request was fine, the store is not reachable.
+        # Never silently record the decision somewhere else.
+        raise HTTPException(
+            status_code=503,
+            detail=f"Decisions are stored in Supabase, which is not available. {exc}",
+        ) from exc
+
+
+@app.get("/api/store")
+def store_state() -> dict:
+    return store_status()
+
+
+@app.get("/api/decisions")
+def decisions(instance_id: str) -> dict:
+    store = _require_store()
+    return {
+        "approvals": [a.model_dump() for a in store.approvals(instance_id)],
+        "completions": [c.model_dump() for c in store.completions(instance_id)],
+    }
+
+
+@app.post("/api/approvals")
+def add_approval(body: ApprovalIn) -> dict:
+    store = _require_store()
+    return store.approve(Approval(**body.model_dump())).model_dump()
+
+
+@app.delete("/api/approvals")
+def remove_approval(
+    instance_id: str, section_id: str, start_iso: str
+) -> dict:
+    _require_store().unapprove(instance_id, section_id, start_iso)
+    return {"removed": True}
+
+
+@app.post("/api/completions")
+def add_completion(body: CompletionIn) -> dict:
+    store = _require_store()
+    return store.complete(Completion(**body.model_dump())).model_dump()
+
+
+@app.delete("/api/completions")
+def remove_completion(instance_id: str, task_id: str) -> dict:
+    _require_store().uncomplete(instance_id, task_id)
+    return {"removed": True}
 
 
 @app.get("/api/criticality")

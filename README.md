@@ -149,10 +149,19 @@ is open to planned work (default: quietest 25%).
 
 Then open <http://localhost:8077>.
 
-**It is a worklist, not a dashboard.** The user is a divisional planning
-officer whose Monday job is: read the closures proposed for the coming
-period, deal with the ones that need a decision, accept the rest. So the
-screen is exactly that —
+Four views onto one job:
+
+- **Calendar** — the period at a glance, one cell per day showing how many
+  closures, the train-hours they cost, and which departments are involved.
+  Pick a day to see and act on its closures.
+- **Plan** — the worklist, described below.
+- **Approved** — what has been signed off, by whom and when.
+- **Completed** — jobs reported done.
+
+**The Plan view is a worklist, not a dashboard.** The user is a divisional
+planning officer whose Monday job is: read the closures proposed for the
+coming period, deal with the ones that need a decision, accept the rest. So
+that screen is exactly that —
 
 - a one-line brief (how many closures, how many jobs placed, train-hours
   saved by sharing, how many need a decision),
@@ -188,6 +197,29 @@ fallback: offline the page is typographically plain but entirely functional.
 That is a deliberate departure from the brief's "React + Gantt library"; the
 trade-off is discussed below.
 
+### Decisions are stored in Supabase
+
+Approvals and completions are the only things this system persists —
+everything else rebuilds from a seed and the cached timetable. They go to
+**Supabase and nowhere else**: there is deliberately no local fallback,
+because an approval one planner can see and another cannot is worse than
+being told the store is unreachable. Without it, planning works normally and
+the approve/complete actions are disabled with an explanation.
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Run [`src/store/schema.sql`](src/store/schema.sql) in the SQL editor
+3. Add to `.env` (gitignored):
+
+```
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+```
+
+The schema's row-level-security policies allow anonymous read and write,
+which is right for a prototype and **wrong for anything real** — a live
+deployment must scope writes to an authenticated planner so `decided_by`
+means something. That is called out in the SQL rather than left silent.
+
 ### Recorded demo (stage backup)
 
 ```bash
@@ -217,6 +249,7 @@ src/optimiser/    CP-SAT model: windows.py (time grid, permitted windows),
 src/ml/           Criticality scoring (LightGBM) + explainability
 src/baseline/     Manual-process simulator and the before/after comparison
 src/api/          FastAPI backend + dependency-free browser UI
+src/store/        Supabase persistence for approvals and completions
 scripts/          CLI entry points
 tests/            pytest — constraint tests mandatory from Phase 1
 ```
