@@ -83,3 +83,33 @@ def test_scoring_before_training_is_refused():
     instance = build_instance({"S1": NIGHT_SPARSE}, [task("T1", "S1", 60)])
     with pytest.raises(RuntimeError):
         model.score_instance(instance)
+
+
+def test_missing_native_library_falls_back_to_sklearn(monkeypatch):
+    """LightGBM is a native wheel linking against OpenMP.
+
+    On a slim base image it installs cleanly and then raises
+    OSError("libgomp.so.1: cannot open shared object file") on first use.
+    Catching only ImportError turned a missing system library into a 500 on
+    every request, so OSError must fall back too.
+    """
+    import builtins
+
+    from src.adapters import SyntheticDataSource
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "lightgbm":
+            raise OSError("libgomp.so.1: cannot open shared object file")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    instance = SyntheticDataSource(n_tasks=20).load()
+    model = CriticalityModel()
+    report = model.train(instance.sections, n_records=600)
+    assert model.backend == "sklearn"
+    assert 0.0 < report.auc < 1.0
+    scores = model.score_instance(instance)
+    assert len(scores) == len(instance.tasks)

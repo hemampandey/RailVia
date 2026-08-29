@@ -90,7 +90,13 @@ class CriticalityModel:
                 zip(names, self.model.booster_.feature_importance(importance_type="gain"))
             )
             self.backend = "lightgbm"
-        except ImportError:  # pragma: no cover - exercised only without LightGBM
+        except (ImportError, OSError) as exc:  # pragma: no cover
+            # OSError as well as ImportError: LightGBM is a native wheel that
+            # links against OpenMP, and on a slim base image it installs
+            # cleanly then raises OSError("libgomp.so.1: cannot open shared
+            # object file") on first use. Catching only ImportError turned a
+            # missing system library into a 500 on every request.
+            log.warning("LightGBM unavailable (%s); using scikit-learn", exc)
             from sklearn.ensemble import GradientBoostingClassifier
 
             self.model = GradientBoostingClassifier(random_state=self.seed)

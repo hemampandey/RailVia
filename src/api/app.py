@@ -17,8 +17,9 @@ import os
 import pathlib
 import threading
 
-from fastapi import Body, FastAPI, Header, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -206,6 +207,24 @@ def _block_payload(block, grid: TimeGrid, tasks_by_id: dict) -> dict:
             for tid in block.task_ids
         ],
     }
+
+
+@app.exception_handler(Exception)
+async def unhandled(request: Request, exc: Exception) -> JSONResponse:
+    """Return the reason, not a bare 500.
+
+    An unhandled error reached the browser as an opaque failure, leaving the
+    only diagnosis in server logs. The message goes in the response so it is
+    visible where the problem is noticed.
+    """
+    log.exception("unhandled error on %s", request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": f"{type(exc).__name__}: {exc}",
+            "path": request.url.path,
+        },
+    )
 
 
 @app.get("/api/health")

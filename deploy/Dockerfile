@@ -31,6 +31,14 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+# libgomp1 is the OpenMP runtime. LightGBM, and parts of SciPy and
+# scikit-learn, are native wheels that link against it, and Debian slim
+# images do not ship it. Without this the wheels install cleanly and then
+# fail at import with "libgomp.so.1: cannot open shared object file".
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Dependencies first: application edits should not rebuild this layer.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

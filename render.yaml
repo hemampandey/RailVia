@@ -34,7 +34,7 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
-      - key: SUPABASE_URL
+      - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
-      - key: SUPABASE_KEY
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
