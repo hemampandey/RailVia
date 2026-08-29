@@ -267,3 +267,32 @@ def test_ui_and_api_coexist_on_one_origin():
         page = client.get(route)
         assert page.status_code == 200, route
         assert "RailVia" in page.text
+
+
+def test_server_falls_back_to_the_public_supabase_variables(monkeypatch):
+    """Setting the same values twice is a trap, so the server accepts the
+    NEXT_PUBLIC_ names too.
+
+    Next only exposes NEXT_PUBLIC_-prefixed variables to browser code, so the
+    front end must have its own copy. Setting only that pair made sign-in
+    work while every approval failed — the confusing half-configured state.
+    """
+    from src.store.supabase_store import configured_key, configured_url
+
+    for name in ("SUPABASE_URL", "SUPABASE_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_URL", "https://proj.supabase.co")
+    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key")
+
+    assert configured_url() == "https://proj.supabase.co"
+    assert configured_key() == "anon-key"
+
+
+def test_explicit_server_key_wins_over_the_public_one(monkeypatch):
+    """A deployment using a service key must not be overridden by the anon
+    key the browser uses."""
+    from src.store.supabase_store import configured_key
+
+    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key")
+    monkeypatch.setenv("SUPABASE_KEY", "service-key")
+    assert configured_key() == "service-key"

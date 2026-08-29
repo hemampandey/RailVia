@@ -27,6 +27,27 @@ log = logging.getLogger(__name__)
 URL_VAR = "SUPABASE_URL"
 KEY_VAR = "SUPABASE_KEY"
 
+# The browser bundle needs its own copy of these, and Next only exposes
+# variables prefixed NEXT_PUBLIC_ to client code — a deliberate guard against
+# shipping a secret in a public bundle. That leaves the same two values
+# needing two names, which is a trap: set only the NEXT_PUBLIC_ pair and
+# sign-in works while every approval fails.
+#
+# So the server falls back to the prefixed names. Safe, because this is the
+# anon key: it is designed to be public, and row-level security is what
+# protects the data. A deployment using a service key sets SUPABASE_KEY
+# explicitly, which still wins.
+URL_FALLBACK = "NEXT_PUBLIC_SUPABASE_URL"
+KEY_FALLBACK = "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+
+
+def configured_url() -> str | None:
+    return os.environ.get(URL_VAR) or os.environ.get(URL_FALLBACK)
+
+
+def configured_key() -> str | None:
+    return os.environ.get(KEY_VAR) or os.environ.get(KEY_FALLBACK)
+
 
 class SupabaseNotConfigured(RuntimeError):
     pass
@@ -42,8 +63,8 @@ class SupabaseStore(Store):
         key: str | None = None,
         access_token: str | None = None,
     ) -> None:
-        url = url or os.environ.get(URL_VAR)
-        key = key or os.environ.get(KEY_VAR)
+        url = url or configured_url()
+        key = key or configured_key()
         if not url or not key:
             missing = [n for n, v in ((URL_VAR, url), (KEY_VAR, key)) if not v]
             # Say it in terms of wherever this is actually running. Telling

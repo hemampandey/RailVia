@@ -30,10 +30,10 @@ services:
       # src/optimiser/model.py.
       - key: SOLVER_WORKERS
         value: "2"
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_KEY
-        sync: false
+      # Only these two. The server reads the NEXT_PUBLIC_ names when the
+      # unprefixed ones are absent, so the same values do not need setting
+      # twice. Both are safe to expose: the anon key is designed for
+      # browsers, and row-level security is what protects the data.
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY

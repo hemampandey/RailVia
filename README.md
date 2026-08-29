@@ -250,19 +250,23 @@ long-running optimiser; serverless is the wrong shape for it, and no
    A service's runtime cannot be changed after it is created, so a service
    made with the Python runtime has to be deleted and replaced rather than
    converted. The blueprint creates it with Docker already set.
-3. Fill in four environment variables:
+3. Fill in two environment variables:
 
-| Variable | Notes |
+| Variable | |
 |---|---|
-| `SUPABASE_URL` | as in `.env` |
-| `SUPABASE_KEY` | the anon key |
-| `NEXT_PUBLIC_SUPABASE_URL` | same URL — baked into the UI at build time |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same key — likewise |
+| `NEXT_PUBLIC_SUPABASE_URL` | your project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your anon key |
 
-The two `NEXT_PUBLIC_*` values are compiled into the front end, so changing
-them needs a redeploy rather than a restart. Both are safe to expose: the
-anon key is designed for browsers, and row-level security is what protects
-the data.
+Next only exposes variables prefixed `NEXT_PUBLIC_` to browser code — a guard
+against shipping secrets in a public bundle — so the front end needs its own
+copy. Rather than make you set the same values twice, the server reads those
+names when the unprefixed `SUPABASE_URL` / `SUPABASE_KEY` are absent. A
+deployment using a service key sets `SUPABASE_KEY` explicitly, and that still
+wins.
+
+These are compiled into the front end at build time, so changing them needs a
+redeploy rather than a restart. Both are safe to expose: the anon key is
+designed for browsers, and row-level security is what protects the data.
 
 **Memory is the thing that bites.** Each CP-SAT worker holds its own copy of
 the search state, so worker count is a memory setting as much as a speed one.

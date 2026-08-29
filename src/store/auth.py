@@ -60,7 +60,9 @@ class Caller:
 
 
 def jwks_url() -> str | None:
-    base = os.environ.get(URL_VAR)
+    # Same fallback as the store: the browser's copy of the project URL is
+    # the same URL, and requiring it under two names is a needless trap.
+    base = os.environ.get(URL_VAR) or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
     return f"{base.rstrip('/')}/auth/v1/.well-known/jwks.json" if base else None
 
 
