@@ -248,10 +248,26 @@ Split the deployment instead:
 | `web/` (Next.js) | Vercel | Exactly what Vercel is for |
 | API (Python) | Render / Railway / Fly.io | Container, no size limit, no request timeout |
 
-**Front end on Vercel.** Import the repo and set **Root Directory** to
-`web/`. Add two environment variables — `NEXT_PUBLIC_SUPABASE_URL` and
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` — plus `NEXT_PUBLIC_API_ORIGIN` pointing at
-the deployed API.
+**Front end on Vercel.** The one setting that matters:
+
+> Project → Settings → General → **Root Directory** → `web`
+
+Without it Vercel builds the repository root, finds `requirements.txt`, and
+tries to deploy the Python API — which is what "No FastAPI entrypoint found"
+and the failed deployment both are. `.vercelignore` excludes the Python side
+as a second line of defence, but the Root Directory setting is the fix.
+
+Then add three environment variables under Settings → Environment Variables:
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | same as in `.env` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same as in `.env` |
+| `NEXT_PUBLIC_API_ORIGIN` | the deployed API's URL |
+
+Until the API is deployed, the site will build and sign in, and every view
+will report that it cannot reach the planning API. That is the expected
+half-deployed state, not a new fault.
 
 **API on Render.** [`deploy/render.yaml`](deploy/render.yaml) is a blueprint;
 [`deploy/Dockerfile`](deploy/Dockerfile) works anywhere that runs containers.
