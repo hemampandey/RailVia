@@ -1078,3 +1078,73 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ── network map ───────────────────────────────────────────────────── */
+.map{display:block;width:100%;max-width:100%;height:auto;min-width:620px}
+.map-label{font-family:var(--font-mono);font-size:9.5px;fill:var(--text-faint)}
+
+/* ── sign in ───────────────────────────────────────────────────────
+   The sign-in page lost its styling when the stylesheet was rewritten:
+   LoginGate still uses these classes, and nothing defined them, so the
+   first screen anyone sees rendered as bare HTML. Written against the
+   current tokens rather than restored from the old sheet. */
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--s5);
+}
+.login {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: var(--s5);
+}
+.login h2 { margin: 0 0 var(--s1); }
+.login form { display: flex; flex-direction: column; }
+.login label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin: var(--s3) 0 5px;
+}
+.login input {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.login input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary);
+}
+.login button.primary {
+  width: 100%;
+  margin-top: var(--s4);
+  min-height: 44px;
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+  font-weight: 650;
+}
+.login button.primary:hover:not(:disabled) { background: var(--primary-hover); }
+.login-err {
+  margin-top: var(--s3);
+  font-size: 12.5px;
+  color: var(--bad);
+  background: var(--bad-soft);
+  padding: var(--s2) var(--s3);
+  border-radius: var(--radius-sm);
+}
+.login code { font-family: var(--font-mono); font-size: 12px; }

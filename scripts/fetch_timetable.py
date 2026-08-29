@@ -80,13 +80,20 @@ def main() -> int:
         print(f"\n{len(needed)} distinct stations to fetch")
         boards = {}
         names: dict[str, str] = {}
+        coords: dict[str, tuple[float, float]] = {}
         for code in needed:
             payload = client.station_board(code, include_intermediate=True)
             boards[code] = payload
             body = payload.get("data") if isinstance(payload, dict) else None
             station = body.get("station") if isinstance(body, dict) else None
-            if isinstance(station, dict) and station.get("name"):
-                names[code] = str(station["name"])
+            if isinstance(station, dict):
+                if station.get("name"):
+                    names[code] = str(station["name"])
+                lat, lng = station.get("lat"), station.get("lng")
+                if lat is not None and lng is not None:
+                    # Real positions, so a map shows the corridor as it runs
+                    # on the ground rather than as an invented schematic.
+                    coords[code] = (float(lat), float(lng))
     except RailRadarError as exc:
         print(f"\nFAILED: {exc}", file=sys.stderr)
         if "API key" in str(exc):
@@ -134,6 +141,14 @@ def main() -> int:
             "source": "RailRadar API (aggregates public Indian Railways NTES timetable)",
             "source_url": "https://railradar.in/docs",
             "corridors": corridors,
+            "stations": {
+                code: {
+                    "name": names.get(code, code),
+                    "lat": coords.get(code, (None, None))[0],
+                    "lng": coords.get(code, (None, None))[1],
+                }
+                for code in needed
+            },
             "derived_from_train": args.from_train,
             "sections": [
                 {
@@ -151,6 +166,24 @@ def main() -> int:
                     "profile_by_dow": s.profile_by_dow,
                     "daily_trains": s.daily_trains,
                     "distinct_trains": s.distinct_trains,
+                    # The named trains crossing this section, with the minute
+                    # past midnight each enters. This is what makes a closure
+                    # concrete: not "26 train-hours" but the Shram Shakti
+                    # Express and thirty-nine others.
+                    "trains": sorted(
+                        (
+                            {
+                                "number": t.train_number,
+                                "name": t.train_name,
+                                "entry": t.entry_min,
+                                "exit": t.exit_min,
+                                "days": sorted(t.run_days),
+                                "type": t.train_type,
+                            }
+                            for t in s.traversals
+                        ),
+                        key=lambda t: t["entry"],
+                    ),
                     "train_types": sorted({t.train_type for t in s.traversals if t.train_type}),
                 }
                 for s in sections

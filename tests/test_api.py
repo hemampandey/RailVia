@@ -296,3 +296,68 @@ def test_explicit_server_key_wins_over_the_public_one(monkeypatch):
     monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key")
     monkeypatch.setenv("SUPABASE_KEY", "service-key")
     assert configured_key() == "service-key"
+
+
+# --- the network map and closure impact -----------------------------------
+
+
+def test_network_returns_geometry_with_real_coordinates():
+    body = client.get("/api/network").json()
+    assert body["stations"] and body["sections"]
+    for code, station in body["stations"].items():
+        assert station["name"]
+        # Every station carries real coordinates from the timetable feed;
+        # a missing one would silently collapse to the map's origin.
+        assert station["lat"] is not None, f"{code} has no latitude"
+        assert station["lng"] is not None, f"{code} has no longitude"
+        assert 6 < station["lat"] < 38, f"{code} is outside India"
+        assert 68 < station["lng"] < 98, f"{code} is outside India"
+
+
+def test_network_sections_reference_known_stations():
+    """A section pointing at a station the map has no position for draws a
+    line to nowhere."""
+    body = client.get("/api/network").json()
+    known = set(body["stations"])
+    for section in body["sections"]:
+        assert section["a"] in known, section["id"]
+        assert section["b"] in known, section["id"]
+
+
+def test_impact_lists_the_trains_a_closure_stops():
+    body = client.get("/api/impact", params={
+        "section_id": "SBB-GZB",
+        "start": "2026-08-31T03:45:00", "end": "2026-08-31T06:00:00",
+    }).json()
+    assert body["affected_count"] == len(body["trains"])
+    assert body["trains"], "the busiest section should stop somebody"
+    for train in body["trains"]:
+        assert train["number"] and train["name"]
+        # Every train must fall inside the window it is reported for.
+        assert body["start"][:10] <= train["at"][:10]
+
+
+def test_impact_window_actually_filters():
+    """A wider closure must stop at least as many trains as a narrow one."""
+    narrow = client.get("/api/impact", params={
+        "section_id": "SBB-GZB",
+        "start": "2026-08-31T03:00:00", "end": "2026-08-31T03:30:00"}).json()
+    wide = client.get("/api/impact", params={
+        "section_id": "SBB-GZB",
+        "start": "2026-08-31T03:00:00", "end": "2026-08-31T07:00:00"}).json()
+    assert wide["affected_count"] >= narrow["affected_count"]
+    assert wide["affected_count"] > 0
+
+
+def test_impact_rejects_an_unknown_section():
+    res = client.get("/api/impact", params={
+        "section_id": "NOWHERE", "start": "2026-08-31T00:00:00",
+        "end": "2026-08-31T04:00:00"})
+    assert res.status_code == 404
+
+
+def test_impact_rejects_a_bad_timestamp():
+    res = client.get("/api/impact", params={
+        "section_id": "SBB-GZB", "start": "not-a-time",
+        "end": "2026-08-31T04:00:00"})
+    assert res.status_code == 400

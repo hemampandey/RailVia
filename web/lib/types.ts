@@ -104,3 +104,27 @@ export const ROLE_LABEL: Record<Role, string> = {
   head: "Divisional head",
   engineer: "Section engineer",
 };
+
+export interface Station { name: string; lat: number | null; lng: number | null; }
+
+export interface NetworkSection {
+  id: string; a: string; b: string; name: string;
+  length_km: number | null; daily_trains: number; peak: number;
+}
+
+export interface Network {
+  stations: Record<string, Station>;
+  sections: NetworkSection[];
+  corridors: string[][];
+}
+
+export interface AffectedTrain {
+  number: string; name: string; entry: number; exit: number | null;
+  days: number[]; type: string; at: string;
+}
+
+export interface Impact {
+  section_id: string; section_name: string;
+  start: string; end: string;
+  affected_count: number; trains: AffectedTrain[];
+}

@@ -12,6 +12,7 @@ import { ROLE_LABEL } from "@/lib/types";
 const NAV = [
   { href: "/", label: "Calendar", icon: PATH.calendar },
   { href: "/plan", label: "Plan", icon: PATH.list },
+  { href: "/map", label: "Map", icon: PATH.map },
   { href: "/approved", label: "Approved", icon: PATH.check },
   { href: "/completed", label: "Completed", icon: PATH.done },
 ];
@@ -36,6 +37,9 @@ export function Sidebar() {
       return plan.exceptions.length
         ? { text: String(plan.exceptions.length), warn: true }
         : { text: String(plan.block_count) };
+    }
+    if (href === "/map") {
+      return { text: String(new Set(plan.blocks.map((b) => b.section_id)).size) };
     }
     if (href === "/approved") return { text: String(approvals.size) };
     return { text: String(completions.size) };

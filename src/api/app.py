@@ -380,6 +380,98 @@ def comparison(
     }
 
 
+# ── the network, and what a closure actually costs ──────────────────────
+#
+# Station positions and the trains crossing each section come from the same
+# cached timetable the traffic profiles do. The full set is 7,000+ traversals,
+# far too much to send to a browser, so it is sliced per closure.
+
+
+@functools.lru_cache(maxsize=1)
+def _network() -> dict:
+    import json
+
+    path = pathlib.Path("data/grounded_sections.json")
+    if not path.exists():
+        raise HTTPException(
+            status_code=503,
+            detail="No timetable data. Run scripts/fetch_timetable.py first.",
+        )
+    return json.loads(path.read_text())
+
+
+@app.get("/api/network")
+def network() -> dict:
+    """Geometry only — positions and section endpoints, no train lists."""
+    data = _network()
+    return {
+        "stations": data["stations"],
+        "sections": [
+            {
+                "id": s["id"], "a": s["station_a"], "b": s["station_b"],
+                "name": s.get("name", s["id"]),
+                "length_km": s.get("length_km"),
+                "daily_trains": s.get("daily_trains", 0),
+                "peak": max(s["traffic_density_profile"]) if s.get("traffic_density_profile") else 0,
+            }
+            for s in data["sections"]
+        ],
+        "corridors": data.get("corridors", []),
+    }
+
+
+@app.get("/api/impact")
+def impact(section_id: str, start: str, end: str) -> dict:
+    """Which trains a closure actually stops.
+
+    A closure costs train-hours, which is an abstraction. These are the named
+    services that would otherwise have run through that section in that
+    window — the same trains the traffic profile was counted from.
+    """
+    from datetime import datetime
+
+    try:
+        begins = datetime.fromisoformat(start)
+        finishes = datetime.fromisoformat(end)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"start and end must be ISO datetimes: {exc}"
+        ) from exc
+
+    data = _network()
+    section = next(
+        (s for s in data["sections"] if s["id"] == section_id), None
+    )
+    if section is None:
+        raise HTTPException(status_code=404, detail=f"unknown section {section_id}")
+
+    weekday = begins.weekday()
+    first = begins.hour * 60 + begins.minute
+    span = max(1, int((finishes - begins).total_seconds() // 60))
+
+    affected = []
+    for train in section.get("trains", []):
+        if train["days"] and weekday not in train["days"]:
+            continue
+        # Minutes from the closure's start, wrapping past midnight.
+        offset = (train["entry"] - first) % (24 * 60)
+        if offset < span:
+            affected.append({
+                **train,
+                "at": (begins + __import__("datetime").timedelta(minutes=offset))
+                      .isoformat(timespec="minutes"),
+            })
+    affected.sort(key=lambda t: t["at"])
+
+    return {
+        "section_id": section_id,
+        "section_name": section.get("name", section_id),
+        "start": begins.isoformat(), "end": finishes.isoformat(),
+        "affected_count": len(affected),
+        "trains": affected,
+    }
+
+
 # ── decisions: approvals and completions ────────────────────────────────
 #
 # These are the only things this system persists. Everything else is

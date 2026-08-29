@@ -1,5 +1,5 @@
 import type {
-  Approval, Block, Completion, Me, Plan, StoreStatus,
+  Approval, Block, Completion, Impact, Me, Network, Plan, StoreStatus,
 } from "./types";
 
 /** Planning parameters. Kept in one place so every view asks for the same
@@ -92,6 +92,19 @@ export const getPlan = (p: PlanParams) =>
   json<Plan>(`${API_ORIGIN}/api/plan?${qs(p)}`);
 
 export const getStore = () => json<StoreStatus>(`${API_ORIGIN}/api/store`);
+
+/** Station positions and section geometry. Fetched once — it does not change
+ *  with the plan. */
+export const getNetwork = () => json<Network>(`${API_ORIGIN}/api/network`);
+
+/** The named trains a closure stops. Sliced per closure because the full set
+ *  is over seven thousand traversals. */
+export const getImpact = (sectionId: string, start: string, end: string) =>
+  json<Impact>(
+    `${API_ORIGIN}/api/impact?${new URLSearchParams({
+      section_id: sectionId, start, end,
+    })}`,
+  );
 
 export const getMe = (token: string) =>
   json<Me>(`${API_ORIGIN}/api/me`, { headers: auth(token) });
