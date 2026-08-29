@@ -40,7 +40,7 @@ export function Sidebar() {
         <span className="mark" aria-hidden="true">
           <Icon d={PATH.rail} size={14} />
         </span>
-        <b>Block Planner<span>Divisional maintenance · SIH26027</span></b>
+        <b>RailVia</b>
       </div>
       <nav aria-label="Views">
         {NAV.map((item) => {
@@ -68,10 +68,6 @@ export function Sidebar() {
             </span>
           </div>
         )}
-        <span className={"store " + (store?.connected ? "on" : "off")}
-          title={store?.detail ?? ""}>
-          {store?.connected ? "Supabase connected" : "Supabase offline"}
-        </span>
         <ThemeToggle />
         {session && (
           <button className="theme-btn" type="button" onClick={signOut}>

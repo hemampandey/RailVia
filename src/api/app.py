@@ -10,12 +10,16 @@ click, and the front end polls nothing.
 
 from __future__ import annotations
 
+import contextlib
 import functools
+import logging
+import threading
 
 from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from src.api import cache
 from src.adapters import GroundedTimetableSource, SyntheticDataSource
 from src.baseline.compare import run_comparison
 from src.ml.criticality import CriticalityModel
@@ -27,13 +31,37 @@ from src.store import (
     store_status, verify,
 )
 
+log = logging.getLogger(__name__)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Solve the default view in the background at boot.
+
+    Without this the first person to open the app waits for a cold solve.
+    Daemon thread, so it never holds up shutdown.
+    """
+
+    def warm() -> None:
+        try:
+            plan(grounded=True, tasks=120, days=7, seed=42,
+                 time_limit=DEFAULT_UI_BUDGET)
+            log.info("warm cache ready for the default view")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("cache warming failed: %s", exc)
+
+    threading.Thread(target=warm, daemon=True, name="warm-cache").start()
+    yield
+
+
 app = FastAPI(
     title="Automatic Block Planning (SIH26027)",
     description=(
         "Coordinated maintenance block scheduling. Traffic data is real "
         "(published Indian Railways timetable); maintenance tasks are synthetic."
     ),
-    version="0.5.0",
+    version="0.6.0",
+    lifespan=lifespan,
 )
 
 
@@ -42,6 +70,12 @@ app = FastAPI(
 # the socket up long before that (ECONNRESET). Two origins plus CORS is the
 # ordinary shape for a SPA over a separate API, and it removes the proxy as a
 # failure point during a demo.
+# 10 seconds, not 30. Measured on the 120-task instance: 10s gives 237
+# train-hours against 280 at 30s — the extra 20 seconds wanders and finds
+# nothing better, because the search is not monotone under a time limit. The
+# warm start does most of the work in milliseconds; the solver refines it.
+DEFAULT_UI_BUDGET = 10.0
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -164,9 +198,18 @@ def _plan(grounded: bool, tasks: int, days: int, seed: int, time_limit: float,
 
 @app.get("/api/plan")
 def plan(
-    grounded: bool = True, tasks: int = 120, days: int = 30,
-    seed: int = 42, time_limit: float = 30.0, percentile: float = 25.0,
+    grounded: bool = True, tasks: int = 120, days: int = 7,
+    seed: int = 42, time_limit: float = DEFAULT_UI_BUDGET,
+    percentile: float = 25.0,
 ) -> dict:
+    cache_key = cache.key(
+        grounded=grounded, tasks=tasks, days=days, seed=seed,
+        time_limit=time_limit, percentile=percentile,
+    )
+    cached = cache.load(cache_key)
+    if cached is not None:
+        return cached
+
     instance, planner, solution, scores = _plan(
         grounded, tasks, days, seed, time_limit, percentile
     )
@@ -206,7 +249,7 @@ def plan(
         })
     exceptions.sort(key=lambda e: (-e["criticality"], e["due"]))
 
-    return {
+    payload = {
         "instance_id": instance.instance_id,
         "status": solution.status,
         "wall_time": round(solution.wall_time, 2),
@@ -224,6 +267,8 @@ def plan(
         "horizon_days": instance.horizon_days,
         "sections": {s.id: s.name for s in instance.sections},
     }
+    cache.store(cache_key, payload)
+    return payload
 
 
 @app.get("/api/comparison")

@@ -63,7 +63,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
       <div className="login">
         <div className="brand" style={{ padding: 0, marginBottom: 20 }}>
           <span className="mark" aria-hidden="true"><Icon d={PATH.rail} size={14} /></span>
-          <b>Block Planner<span>Divisional maintenance · SIH26027</span></b>
+          <b>RailVia</b>
         </div>
 
         {!configured ? (

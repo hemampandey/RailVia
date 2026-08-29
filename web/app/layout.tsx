@@ -6,7 +6,7 @@ import { PlannerProvider } from "@/components/PlannerProvider";
 import { Sidebar } from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "Block Planner — SIH26027",
+  title: "RailVia",
   description:
     "Coordinated maintenance block scheduling for Indian Railways. "
     + "Traffic data is real; maintenance jobs are simulated.",

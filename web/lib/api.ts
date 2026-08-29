@@ -13,7 +13,9 @@ export interface PlanParams {
 }
 
 export const DEFAULT_PARAMS: PlanParams = {
-  days: 7, tasks: 120, grounded: true, timeLimit: 30,
+  // 10s, not 30: measured, 10 gives a better plan than 30 on this instance.
+  // See the note beside DEFAULT_UI_BUDGET in src/api/app.py.
+  days: 7, tasks: 120, grounded: true, timeLimit: 10,
 };
 
 /** The FastAPI service. Called directly, not through Next's rewrite proxy:
