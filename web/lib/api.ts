@@ -38,7 +38,19 @@ const auth = (token?: string): HeadersInit =>
   token ? { Authorization: `Bearer ${token}` } : {};
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+  let res: Response;
+  try {
+    res = await fetch(url, init);
+  } catch {
+    // A browser reports every network-level failure as the same opaque
+    // "Failed to fetch". Nine times out of ten here it means the Python
+    // service is not running, so say that rather than repeating the browser.
+    throw new Error(
+      `Cannot reach the planning API at ${API_ORIGIN}. `
+      + "It runs separately from this app — start it with:  "
+      + ".venv/bin/uvicorn src.api.app:app --port 8077",
+    );
+  }
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try {

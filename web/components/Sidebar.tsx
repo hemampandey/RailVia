@@ -18,7 +18,7 @@ const NAV = [
 export function Sidebar() {
   const path = usePathname();
   const { plan, store, approvals, completions } = usePlanner();
-  const { me, session, signOut } = useAuth();
+  const { me, session, signOut, error: authError } = useAuth();
 
   /** Counts on the nav so the sidebar says what needs attention without
    *  making anyone open each view to find out. */
@@ -61,8 +61,10 @@ export function Sidebar() {
         {session && (
           <div className="who">
             <b>{me?.email ?? session.user.email}</b>
-            <span className={"role" + (me?.role === "engineer" ? " eng" : "")}>
-              {me ? ROLE_LABEL[me.role] : "…"}
+            <span className={"role" + (me?.role === "engineer" ? " eng" : "")
+              + (me ? "" : " unknown")}
+              title={me ? undefined : authError ?? "waiting for the API"}>
+              {me ? ROLE_LABEL[me.role] : "role unknown"}
             </span>
           </div>
         )}

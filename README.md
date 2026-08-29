@@ -144,7 +144,13 @@ is open to planned work (default: quietest 25%).
 ### The app
 
 Two processes: a Python API (the optimiser lives here — OR-Tools and LightGBM
-have no Node equivalent) and a Next.js front end.
+have no Node equivalent) and a Next.js front end. Start both with:
+
+```bash
+./run.sh
+```
+
+Or separately, in two terminals:
 
 ```bash
 .venv/bin/uvicorn src.api.app:app --port 8077
@@ -153,6 +159,9 @@ have no Node equivalent) and a Next.js front end.
 ```bash
 npm --prefix web run dev
 ```
+
+If the browser says it cannot reach the planning API, the Python half is not
+running — that is the usual cause.
 
 Then open <http://localhost:3000>. The browser calls the API directly on port
 8077 rather than through Next's rewrite proxy — a solve can take 60 seconds

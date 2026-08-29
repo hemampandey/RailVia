@@ -250,3 +250,5 @@ td.num,th.num{text-align:right}
   border-radius:999px;background:var(--primary-soft);color:var(--primary);
   align-self:flex-start}
 .who .role.eng{background:var(--accent-soft);color:var(--accent)}
+
+.who .role.unknown{background:var(--bad-soft);color:var(--bad)}

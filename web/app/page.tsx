@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePlanner } from "@/components/PlannerProvider";
 import { BlockRow } from "@/components/BlockRow";
 import { Fact, HorizonToggle, Loading } from "@/components/Common";
+import { RoleWarning } from "@/components/RoleWarning";
 import { DEPT_VAR, type Block } from "@/lib/types";
 
 export default function CalendarPage() {
@@ -32,6 +33,7 @@ export default function CalendarPage() {
   return (
     <>
       <h1>Calendar</h1>
+      <RoleWarning />
       <div className="brief">
         <div className="brief-top">
           <h2>{fmt(first)} – {fmt(last)}</h2>

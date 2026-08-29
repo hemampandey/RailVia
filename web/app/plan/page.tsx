@@ -3,6 +3,7 @@
 import { usePlanner } from "@/components/PlannerProvider";
 import { BlockRow } from "@/components/BlockRow";
 import { Fact, HorizonToggle, Loading } from "@/components/Common";
+import { RoleWarning } from "@/components/RoleWarning";
 import { Icon, PATH } from "@/components/icons";
 import { DEPT_VAR } from "@/lib/types";
 
@@ -18,6 +19,7 @@ export default function PlanPage() {
   return (
     <>
       <h1>Plan</h1>
+      <RoleWarning />
       <div className="brief">
         <div className="brief-top">
           <h2>Proposed closures</h2>
