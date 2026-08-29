@@ -21,9 +21,10 @@ from pydantic import BaseModel
 
 from src.api import cache
 from src.adapters import GroundedTimetableSource, SyntheticDataSource
+from src.ingest.railradar import load_dotenv
 from src.baseline.compare import run_comparison
 from src.ml.criticality import CriticalityModel
-from src.models import PlanningInstance
+from src.models import PlanningInstance, next_monday
 from src.optimiser.model import BlockPlanner
 from src.optimiser.windows import TimeGrid
 from src.store import (
@@ -32,6 +33,13 @@ from src.store import (
 )
 
 log = logging.getLogger(__name__)
+
+# Load .env once, at import, rather than lazily inside whichever call happens
+# to run first. Token verification reads SUPABASE_URL to find the project's
+# JWKS endpoint, and it runs BEFORE any store call — so relying on the store
+# to load the environment made sign-in work or fail depending on the order
+# the front end happened to make its requests.
+load_dotenv()
 
 
 @contextlib.asynccontextmanager
@@ -202,9 +210,13 @@ def plan(
     seed: int = 42, time_limit: float = DEFAULT_UI_BUDGET,
     percentile: float = 25.0,
 ) -> dict:
+    # The horizon rolls to the coming Monday, so it MUST be part of the key.
+    # Without it, next week would be served this week's plan from disk — the
+    # dates would silently be wrong, which is worse than a slow solve.
     cache_key = cache.key(
         grounded=grounded, tasks=tasks, days=days, seed=seed,
         time_limit=time_limit, percentile=percentile,
+        horizon_start=next_monday().isoformat(),
     )
     cached = cache.load(cache_key)
     if cached is not None:

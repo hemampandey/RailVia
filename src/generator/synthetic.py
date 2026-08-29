@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 
 from src.generator.catalogue import CATALOGUE, ActivitySpec, by_department
 from src.generator.sections import archetype_of, build_sections
+from src.models.calendar import REFERENCE_MONDAY, next_monday
 from src.models import (
     CrewCapacity,
     DataProvenance,
@@ -240,7 +241,7 @@ def build_crew_capacity(
 def generate_instance(
     seed: int = 42,
     n_tasks: int = 20,
-    horizon_start: date = date(2026, 3, 2),  # a Monday
+    horizon_start: date = REFERENCE_MONDAY,
     horizon_days: int = 7,
     n_sections: int | None = 5,
 ) -> PlanningInstance:

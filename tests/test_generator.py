@@ -98,3 +98,51 @@ def test_scales_without_error(seed):
     inst = SyntheticDataSource(seed=seed, n_tasks=60, horizon_days=30).load()
     inst.validate_referential_integrity()
     assert len(inst.tasks) == 60
+
+
+# --- horizon start ---------------------------------------------------------
+
+
+def test_next_monday_returns_today_when_today_is_monday():
+    """Skipping to the following week would hide the week being looked at."""
+    from datetime import date
+
+    from src.models import next_monday
+
+    assert next_monday(date(2026, 8, 31)) == date(2026, 8, 31)   # a Monday
+
+
+@pytest.mark.parametrize(
+    "today,expected",
+    [((2026, 8, 29), (2026, 8, 31)),   # Saturday -> the coming Monday
+     ((2026, 8, 30), (2026, 8, 31)),   # Sunday
+     ((2026, 9, 1), (2026, 9, 7)),     # Tuesday -> next week
+     ((2026, 9, 6), (2026, 9, 7))],    # Sunday
+)
+def test_next_monday(today, expected):
+    from datetime import date
+
+    from src.models import next_monday
+
+    assert next_monday(date(*today)) == date(*expected)
+
+
+def test_next_monday_always_lands_on_a_monday():
+    from datetime import date, timedelta
+
+    from src.models import next_monday
+
+    day = date(2026, 1, 1)
+    for _ in range(400):
+        assert next_monday(day).weekday() == 0
+        day += timedelta(days=1)
+
+
+def test_generator_default_start_stays_fixed():
+    """Benchmarks, tests and the recorded demo need a reproducible instance,
+    so the generator's own default must NOT roll with the calendar."""
+    from src.generator.synthetic import generate_instance
+    from src.models import REFERENCE_MONDAY
+
+    assert generate_instance(n_tasks=5).horizon_start == REFERENCE_MONDAY
+    assert REFERENCE_MONDAY.weekday() == 0

@@ -1,3 +1,4 @@
+from src.models.calendar import REFERENCE_MONDAY, next_monday
 from src.models.core import (
     Block,
     DataProvenance,
@@ -13,6 +14,7 @@ from src.models.core import (
 
 __all__ = [
     "Block",
+    "REFERENCE_MONDAY",
     "DataProvenance",
     "CrewCapacity",
     "Department",
@@ -22,4 +24,5 @@ __all__ = [
     "SourceKind",
     "Task",
     "TrafficWindow",
+    "next_monday",
 ]

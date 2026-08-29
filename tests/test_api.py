@@ -6,6 +6,8 @@ schedule quality, which the optimiser tests cover.
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -147,3 +149,32 @@ def test_planning_stays_open():
 def test_plan_exposes_instance_id_for_keying_decisions():
     body = client.get("/api/plan", params={**SMALL, "time_limit": "5"}).json()
     assert body["instance_id"]
+
+
+def test_importing_the_api_loads_the_environment():
+    """Token verification reads SUPABASE_URL to find the project's JWKS, and
+    it runs before any store call.
+
+    Regression: the environment was loaded lazily inside the store, so
+    whether sign-in worked depended on the order the front end happened to
+    make its requests — /api/store first and it worked, /api/me first and the
+    role came back unknown.
+    """
+    import importlib
+    import os
+
+    saved = {k: os.environ.pop(k, None) for k in ("SUPABASE_URL", "SUPABASE_KEY")}
+    try:
+        import src.api.app as app_module
+
+        importlib.reload(app_module)
+        from src.store.auth import jwks_url
+
+        # Present in .env, so importing the API must be enough to see it.
+        if pathlib.Path(".env").exists():
+            assert os.environ.get("SUPABASE_URL"), "import did not load .env"
+            assert jwks_url()
+    finally:
+        for k, v in saved.items():
+            if v is not None:
+                os.environ[k] = v

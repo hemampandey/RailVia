@@ -43,7 +43,15 @@ export function Sidebar() {
 
   return (
     <aside className={"side" + (collapsed ? " collapsed" : "")}>
-      <div className="brand">
+      <div className="brand ">
+        {!collapsed && (
+          <>
+            <span className="mark" aria-hidden="true">
+              <Icon d={PATH.rail} size={14} />
+            </span>
+            <b>RailVia</b>
+          </>
+        )}
         <button
           type="button"
           className="collapse-toggle"
@@ -54,14 +62,6 @@ export function Sidebar() {
         >
           <span aria-hidden="true">{collapsed ? "›" : "‹"}</span>
         </button>
-        {!collapsed && (
-          <>
-            <span className="mark" aria-hidden="true">
-              <Icon d={PATH.rail} size={14} />
-            </span>
-            <b>RailVia</b>
-          </>
-        )}
       </div>
       <nav aria-label="Views">
         {NAV.map((item) => {

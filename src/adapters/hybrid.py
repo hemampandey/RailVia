@@ -30,6 +30,7 @@ from datetime import date
 from src.adapters.base import DataSource
 from src.models import (
     DataProvenance,
+    next_monday,
     PlanningInstance,
     Section,
     SourceKind,
@@ -64,14 +65,17 @@ class GroundedTimetableSource(DataSource):
         seed: int = 42,
         n_tasks: int = 20,
         horizon_days: int = 7,
-        horizon_start: date = date(2026, 3, 2),  # a Monday
+        horizon_start: date | None = None,
         division: str = "Delhi (Northern Railway)",
     ) -> None:
         self.path = pathlib.Path(path)
         self.seed = seed
         self.n_tasks = n_tasks
         self.horizon_days = horizon_days
-        self.horizon_start = horizon_start
+        # None means "the upcoming Monday" — what a planner wants when they
+        # open the app. Callers that need a fixed, reproducible instance pass
+        # a date explicitly.
+        self.horizon_start = horizon_start or next_monday()
         self.division = division
         self._weekly: dict[str, list[list[float]]] = {}
 
