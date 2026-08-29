@@ -58,6 +58,25 @@ def _comparison(grounded: bool, tasks: int, days: int, seed: int, time_limit: fl
     return run_comparison(instance, time_limit=time_limit, criticality=scores)
 
 
+def _separate_cost(block, planner, tasks_by_id) -> float:
+    """What this block's work would cost as separate single-job closures.
+
+    The saving from merging is the number a planner actually cares about, and
+    it is not visible anywhere in the raw plan. Each job is priced on its own
+    at the same start time, which is what the manual process would produce.
+    """
+    series = planner.traffic.get(block.section_id)
+    if not series:
+        return 0.0
+    total = 0.0
+    for task_id in block.task_ids:
+        task = tasks_by_id[task_id]
+        length = planner.grid.minutes_to_slots(task.duration_minutes)
+        stop = min(block.start_slot + length, len(series))
+        total += sum(series[s] for s in range(block.start_slot, stop)) * planner.grid.slot_hours
+    return round(total, 2)
+
+
 def _block_payload(block, grid: TimeGrid, tasks_by_id: dict) -> dict:
     return {
         "section_id": block.section_id,
@@ -111,30 +130,77 @@ def instance_summary(
     }
 
 
-@app.get("/api/plan")
-def plan(
-    grounded: bool = True, tasks: int = 120, days: int = 30,
-    seed: int = 42, time_limit: float = 30.0, percentile: float = 25.0,
-) -> dict:
+@functools.lru_cache(maxsize=4)
+def _plan(grounded: bool, tasks: int, days: int, seed: int, time_limit: float,
+          percentile: float):
     instance = _load(grounded, tasks, days, seed)
     _, _, scores = _criticality(grounded, tasks, days, seed)
     planner = BlockPlanner(
         instance, time_limit=time_limit, percentile=percentile, criticality=scores
     )
-    solution = planner.solve()
+    return instance, planner, planner.solve(), scores
+
+
+@app.get("/api/plan")
+def plan(
+    grounded: bool = True, tasks: int = 120, days: int = 30,
+    seed: int = 42, time_limit: float = 30.0, percentile: float = 25.0,
+) -> dict:
+    instance, planner, solution, scores = _plan(
+        grounded, tasks, days, seed, time_limit, percentile
+    )
     tasks_by_id = {t.id: t for t in instance.tasks}
+
+    blocks = []
+    for block in solution.blocks:
+        payload = _block_payload(block, planner.grid, tasks_by_id)
+        alone = _separate_cost(block, planner, tasks_by_id)
+        payload["separate_cost"] = alone
+        payload["saving"] = round(max(0.0, alone - block.train_hours), 2)
+        payload["overdue_count"] = sum(
+            1 for t in block.task_ids if tasks_by_id[t].is_overdue
+        )
+        blocks.append(payload)
+
+    # Why each job missed the plan. A planner needs the reason, not the fact.
+    exceptions = []
+    for task_id in solution.unscheduled_task_ids:
+        task = tasks_by_id[task_id]
+        if task_id in solution.impossible_task_ids:
+            reason = "no quiet window long enough on this section"
+            fix = "shorten the job, split it, or widen the permitted hours"
+        elif task.crew_required > planner.crew_ceiling.get(task.department, 99):
+            reason = f"needs {task.crew_required} crews; department never has that many"
+            fix = "borrow crew or split the job"
+        else:
+            reason = "deferred — crew and quiet windows went to more critical work"
+            fix = "extend the horizon, or raise this job's priority"
+        exceptions.append({
+            "id": task_id, "section": task.section_id,
+            "activity": task.activity_type, "department": task.department.value,
+            "severity": task.defect_severity.value, "overdue": task.is_overdue,
+            "due": task.due_date.isoformat(),
+            "criticality": round(scores.get(task_id, 0.0), 3),
+            "reason": reason, "fix": fix,
+        })
+    exceptions.sort(key=lambda e: (-e["criticality"], e["due"]))
+
     return {
         "status": solution.status,
         "wall_time": round(solution.wall_time, 2),
         "train_hours_lost": solution.train_hours_lost,
-        "blocks": [_block_payload(b, planner.grid, tasks_by_id) for b in solution.blocks],
+        "blocks": blocks,
         "block_count": len(solution.blocks),
         "scheduled": solution.scheduled_count,
+        "task_total": len(instance.tasks),
         "shared_blocks": solution.shared_blocks,
         "unscheduled": solution.unscheduled_task_ids,
+        "exceptions": exceptions,
         "late_tasks": solution.late_task_count,
+        "total_saving": round(sum(b["saving"] for b in blocks), 1),
         "horizon_start": instance.horizon_start.isoformat(),
         "horizon_days": instance.horizon_days,
+        "sections": {s.id: s.name for s in instance.sections},
     }
 
 

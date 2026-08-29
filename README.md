@@ -147,13 +147,28 @@ is open to planned work (default: quietest 25%).
 .venv/bin/uvicorn src.api.app:app --port 8077
 ```
 
-Then open <http://localhost:8077>. Four views: block plan (Gantt, coloured by
-department, shared blocks hatched), before/after, criticality with per-task
-explanations, and section traffic profiles.
+Then open <http://localhost:8077>.
 
-Built on a Data-Dense Dashboard system: light and dark themes from one set of
-semantic tokens, Fira Sans/Fira Code with tabular figures so numbers do not
-jitter between solves, and a 4px spacing rhythm.
+**It is a worklist, not a dashboard.** The user is a divisional planning
+officer whose Monday job is: read the closures proposed for the coming
+period, deal with the ones that need a decision, accept the rest. So the
+screen is exactly that —
+
+- a one-line brief (how many closures, how many jobs placed, train-hours
+  saved by sharing, how many need a decision),
+- **the exceptions first**: every job that could not be scheduled, with the
+  reason in plain words and what to do about it,
+- then the closures themselves in time order, grouped by day: when, which
+  section by name, which jobs from which departments share it, what it costs,
+  what sharing saved, and an Accept button.
+
+Deliberately *not* on that screen: solver budget, backlog size, model AUC,
+feature-importance bars. Those are ours, not the planner's; the few useful
+for a demo sit behind an "Evidence and settings" disclosure at the bottom,
+along with the before/after comparison.
+
+Light and dark themes from one set of semantic tokens, Fira Sans/Fira Code
+with tabular figures so numbers do not jitter between solves.
 
 Accessibility was verified in the browser, not assumed:
 
@@ -163,11 +178,9 @@ Accessibility was verified in the browser, not assumed:
   arrow-key navigation and roving `tabindex`.
 - Skip link, visible focus rings, `aria-live` status, and
   `prefers-reduced-motion` honoured.
-- **Nothing depends on colour alone.** Shared blocks are hatched as well as
-  coloured; at the 30-day view bars are only 3-4px wide, so department
-  identity is carried by the tooltip and by the full block table rendered
-  beneath every Gantt — which is also what a screen reader reads, since an
-  SVG chart is not content.
+- **Nothing depends on colour alone.** Every job names its department in
+  text next to its colour dot, and every exception states its reason in
+  words.
 
 No build step and no JS dependencies, so the demo cannot fail because of a
 network. Fonts come from Google with `font-display:swap` behind a full system

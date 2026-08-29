@@ -34,6 +34,28 @@ def test_plan_returns_blocks_with_task_detail():
         assert block["tasks"]
         assert block["end"] > block["start"]
         assert set(block["tasks"][0]) >= {"id", "activity", "department", "severity"}
+        # The saving from merging is what a planner actually acts on.
+        assert block["saving"] >= 0
+        assert block["separate_cost"] >= block["train_hours"] - 1e-6
+
+
+def test_every_unscheduled_job_carries_a_reason_and_a_fix():
+    """A planner needs to know why a job missed the plan, not just that it did."""
+    body = client.get("/api/plan", params={**SMALL, "time_limit": "5"}).json()
+    assert len(body["exceptions"]) == len(body["unscheduled"])
+    for exc in body["exceptions"]:
+        assert exc["reason"] and exc["fix"]
+        assert exc["id"] in body["unscheduled"]
+
+
+def test_shared_blocks_report_a_real_saving():
+    body = client.get(
+        "/api/plan",
+        params={**SMALL, "tasks": "40", "days": "7", "time_limit": "8"},
+    ).json()
+    for block in body["blocks"]:
+        if len(block["tasks"]) > 1:
+            assert block["separate_cost"] >= block["train_hours"]
 
 
 def test_criticality_exposes_importances_and_ranking():
@@ -69,4 +91,4 @@ def test_comparison_contract():
 def test_index_page_served():
     page = client.get("/")
     assert page.status_code == 200
-    assert "Automatic Block Planning" in page.text
+    assert "Block Planner" in page.text
