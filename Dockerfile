@@ -57,6 +57,7 @@ COPY --chown=app:app data/cache/railradar/ data/cache/railradar/
 COPY --chown=app:app data/grounded_sections.json data/
 COPY --chown=app:app --from=ui /ui/out/ web/out/
 COPY --chown=app:app scripts/ scripts/
+RUN mkdir -p data/cache/plans && chown -R app:app data/cache
 
 ENV PYTHONUNBUFFERED=1
 # Two CP-SAT workers. This is a memory limit, not a speed one: the solve
