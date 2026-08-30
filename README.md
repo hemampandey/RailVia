@@ -1,3 +1,14 @@
+---
+title: RailVia
+emoji: 🚂
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Coordinated maintenance block planning for Indian Railways
+---
+
 # Automatic Block Planning — SIH26027
 
 Coordinated maintenance block scheduling for Indian Railways. Three
@@ -243,6 +254,28 @@ NumPy 64, scikit-learn 45 — against a 250 MB serverless limit, and a solve
 takes ten seconds against a ten-second Hobby timeout. This is a CPU-bound,
 long-running optimiser; serverless is the wrong shape for it, and no
 `entrypoint` configuration changes that.
+
+#### Hugging Face Spaces
+
+The most generous free option, and Docker-native.
+
+1. Create a **Space** → SDK **Docker** → Blank
+2. Push this repository to it — the YAML at the top of this README is the
+   Space's own configuration, so nothing else is needed
+3. Settings → **Variables and secrets**, add:
+
+| Name | |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | your project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your anon key |
+
+Add them as **secrets** so they reach the Docker build; the front end is
+compiled with them, so a change needs a rebuild rather than a restart.
+
+The container listens on 7860, which is what Spaces expects. Render and Fly
+set `PORT` themselves and that wins, so the same image serves all three.
+
+#### Render
 
 1. Push to GitHub
 2. Render → **New** → **Blueprint** → pick this repository → **Apply**

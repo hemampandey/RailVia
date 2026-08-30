@@ -18,7 +18,7 @@ services:
   - type: web
     name: railvia
     runtime: docker
-    dockerfilePath: ./deploy/Dockerfile
+    dockerfilePath: ./Dockerfile
     dockerContext: .
     plan: starter          # 'free' works but sleeps after inactivity
     healthCheckPath: /api/health

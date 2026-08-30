@@ -103,3 +103,29 @@ def test_cache_key_includes_the_budget():
     """Two budgets are two different plans and must not share an entry."""
     base = dict(grounded=True, tasks=120, days=31, seed=42, horizon_start="2026-08-01")
     assert cache.key(**base, time_limit=10.0) != cache.key(**base, time_limit=30.0)
+
+
+def test_an_unwritable_cache_does_not_break_the_request(monkeypatch, tmp_path):
+    """A read-only cache directory is a performance problem, not a correctness
+    one — the plan is already computed by the time it is stored.
+
+    Hosts that run the container as a non-root user against a root-owned image
+    hit exactly this, and failing the request would turn a slow page into a
+    broken one.
+    """
+    blocked = tmp_path / "nope"
+    blocked.write_text("i am a file, not a directory")
+    monkeypatch.setattr(cache, "CACHE_DIR", blocked / "plans")
+
+    cache.store(cache.key(tasks=1), {"blocks": []})   # must not raise
+    assert cache.load(cache.key(tasks=1)) is None
+
+
+def test_cache_directory_is_configurable(monkeypatch):
+    import importlib
+
+    monkeypatch.setenv("PLAN_CACHE_DIR", "/tmp/railvia-plans")
+    importlib.reload(cache)
+    assert str(cache.CACHE_DIR) == "/tmp/railvia-plans"
+    monkeypatch.delenv("PLAN_CACHE_DIR")
+    importlib.reload(cache)
