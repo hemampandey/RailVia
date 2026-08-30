@@ -17,7 +17,7 @@ import os
 import pathlib
 import threading
 
-from fastapi import Body, FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,7 +34,7 @@ from src.models import PlanningInstance, next_monday
 from src.optimiser.model import BlockPlanner
 from src.optimiser.windows import TimeGrid
 from src.store import (
-    Approval, AuthError, Caller, Completion, bearer, get_store, store_for,
+    Approval, AuthError, Caller, Completion, bearer, store_for,
     store_status, verify,
 )
 

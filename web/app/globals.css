@@ -64,7 +64,7 @@
   --text-muted: #94a3b8;
   --text-faint: #64748b;
 
-  --primary: #38bdf8;
+  --primary: #264d8e;
   --primary-hover: #7dd3fc;
   --primary-soft: rgba(56, 189, 248, 0.12);
   --primary-glow: rgba(56, 189, 248, 0.25);
@@ -94,18 +94,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #090d16;
-    --surface: #111827;
-    --surface-2: #162032;
-    --surface-3: #1f2d45;
+    --bg: #000000;
+    --surface: #000000;
+    --surface-2: #000000;
+    --surface-3: #000000;
     --border: #24344d;
     --border-soft: #1a273b;
 
     --text: #f1f5f9;
-    --text-muted: #94a3b8;
+    --text-muted: #b5b7ba;
     --text-faint: #64748b;
 
-    --primary: #38bdf8;
+    --primary: #264d8e;
     --primary-hover: #7dd3fc;
     --primary-soft: rgba(56, 189, 248, 0.12);
     --primary-glow: rgba(56, 189, 248, 0.25);
@@ -230,10 +230,10 @@ a { color: inherit; text-decoration: none; }
 }
 
 .collapse-toggle {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 50%;
+  width: 32px;
+  height: 16px;
+  padding: 4px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   background: var(--surface-2);
@@ -750,7 +750,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: fixed;
   top: 0; right: 0; bottom: 0;
   width: 100%;
-  max-width: 520px;
+  max-width: 580px;
   background: var(--surface);
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
@@ -778,6 +778,34 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   display: flex;
   flex-direction: column;
   gap: var(--s3);
+}
+
+.drawer .block {
+  grid-template-columns: 1fr;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+}
+.drawer .block .when {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.drawer .block .when small {
+  margin-top: 0;
+}
+.drawer .block .cost {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-soft);
+  padding-top: var(--s2);
+  margin-top: var(--s1);
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.drawer .block .acts {
+  margin-top: 0;
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

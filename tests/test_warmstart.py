@@ -8,13 +8,9 @@ These tests pin the semantics that matter.
 
 from __future__ import annotations
 
-from datetime import date
-
-import pytest
-
 from src.models import Department
 from src.optimiser.model import BlockPlanner
-from src.optimiser.warmstart import apply_hint, build_greedy
+from src.optimiser.warmstart import build_greedy
 from tests.test_optimiser_constraints import (
     NIGHT_QUIET,
     NIGHT_SPARSE,

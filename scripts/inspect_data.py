@@ -78,8 +78,8 @@ def show_mix(inst: PlanningInstance) -> None:
         1 for t in inst.tasks
         if not t.is_overdue and t.days_to_due(inst.horizon_start) <= inst.horizon_days
     )
-    print(f"  by department : " + "  ".join(f"{k} {v}" for k, v in sorted(by_dept.items())))
-    print(f"  by section    : " + "  ".join(f"{k} {v}" for k, v in sorted(by_section.items())))
+    print("  by department : " + "  ".join(f"{k} {v}" for k, v in sorted(by_dept.items())))
+    print("  by section    : " + "  ".join(f"{k} {v}" for k, v in sorted(by_section.items())))
     print(f"  overdue       : {overdue}/{n} ({overdue / n:.0%})")
     print(f"  due in horizon: {in_horizon}/{n} ({in_horizon / n:.0%})")
     print(f"  not co-locatable: {sum(not t.co_locatable for t in inst.tasks)}/{n}")

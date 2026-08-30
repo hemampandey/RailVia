@@ -50,9 +50,6 @@ export function Sidebar() {
       <div className="brand">
         {!collapsed && (
           <div className="brand-main">
-            <span className="mark" aria-hidden="true">
-              <Icon d={PATH.rail} size={16} />
-            </span>
             <div>
               <b>RailVia</b>
             </div>

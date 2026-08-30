@@ -37,7 +37,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from src.models import Department, PlanningInstance, Task
-from src.optimiser.model import ScheduledBlock, Solution
+from src.optimiser.model import ScheduledBlock
 from src.optimiser.windows import TimeGrid, traffic_by_slot
 
 # The conventional night maintenance window, applied to every section alike.

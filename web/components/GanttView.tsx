@@ -7,7 +7,6 @@ import { DEPT_VAR } from "@/lib/types";
 interface GanttViewProps {
   blocks: Block[];
   sections: Record<string, string>;
-  selectedDayISO?: string;
   onSelectBlock?: (block: Block) => void;
 }
 

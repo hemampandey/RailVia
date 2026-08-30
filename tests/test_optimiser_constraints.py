@@ -32,7 +32,6 @@ from src.models import (
     TrafficWindow,
 )
 from src.optimiser.model import BlockPlanner
-from src.optimiser.windows import TimeGrid
 
 HORIZON_START = date(2026, 3, 2)
 

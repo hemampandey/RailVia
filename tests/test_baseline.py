@@ -7,8 +7,6 @@ single easiest thing for a judge to attack.
 
 from __future__ import annotations
 
-import pytest
-
 from src.baseline.compare import run_comparison, subset_instance
 from src.baseline.manual import ManualBaseline
 from src.models import Department

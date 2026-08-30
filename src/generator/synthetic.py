@@ -12,9 +12,9 @@ from __future__ import annotations
 import random
 from datetime import date, datetime, timedelta
 
-from src.generator.catalogue import CATALOGUE, ActivitySpec, by_department
+from src.generator.catalogue import ActivitySpec, by_department
 from src.generator.sections import archetype_of, build_sections
-from src.models.calendar import REFERENCE_MONDAY, next_monday
+from src.models.calendar import REFERENCE_MONDAY
 from src.models import (
     CrewCapacity,
     DataProvenance,

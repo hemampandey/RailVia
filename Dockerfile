@@ -4,9 +4,9 @@
 # FastAPI at RUN time. So the running container has no Node in it, one origin,
 # no CORS and no proxy — and only one thing to deploy.
 #
-# It cannot be a Vercel-style serverless function: OR-Tools, SciPy, NumPy and
-# scikit-learn come to ~460 MB against a 250 MB limit, and a solve takes ten
-# seconds against a ten-second timeout. A container has neither constraint.
+# The optimiser uses OR-Tools, SciPy, NumPy and scikit-learn (~460 MB),
+# so it runs as a dedicated container on Render. A container has neither
+# serverless package size nor function timeout constraints.
 
 # ── build the UI ────────────────────────────────────────────────────────
 FROM node:22-slim AS ui

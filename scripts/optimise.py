@@ -124,7 +124,7 @@ def main() -> int:
     by_dept = Counter(
         tasks_by_id[t].department.value for b in solution.blocks for t in b.task_ids
     )
-    print(f"  by department         : " + "  ".join(f"{k} {v}" for k, v in sorted(by_dept.items())))
+    print("  by department         : " + "  ".join(f"{k} {v}" for k, v in sorted(by_dept.items())))
     if solution.late_days:
         print(f"  tasks finishing late  : {solution.late_task_count} "
               f"({solution.total_days_late} task-days)")

@@ -23,7 +23,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from src.adapters import GroundedTimetableSource  # noqa: E402
 from src.baseline.compare import run_comparison  # noqa: E402
 from src.ml.criticality import CriticalityModel  # noqa: E402
-from src.optimiser.model import BlockPlanner  # noqa: E402
 from src.optimiser.replan import Disruption, replan_after  # noqa: E402
 
 RULE = "═" * 78

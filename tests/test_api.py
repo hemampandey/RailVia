@@ -234,11 +234,11 @@ def test_different_months_get_different_plans():
 
 def test_deployed_origins_come_from_the_environment(monkeypatch):
     """A deployment's own origin is configured, not hardcoded."""
-    monkeypatch.setenv("ALLOWED_ORIGINS", "https://railvia.vercel.app,https://x.dev/")
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://railvia.onrender.com,https://x.dev/")
     from src.api.app import allowed_origins
 
     origins = allowed_origins()
-    assert "https://railvia.vercel.app" in origins
+    assert "https://railvia.onrender.com" in origins
     assert "https://x.dev" in origins          # trailing slash stripped
     assert "http://localhost:3000" in origins  # local dev still works
 
