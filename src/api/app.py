@@ -58,8 +58,12 @@ async def lifespan(_app: FastAPI):
 
     def warm() -> None:
         try:
-            plan(grounded=True, tasks=120, days=7, seed=42,
-                 time_limit=DEFAULT_UI_BUDGET)  # default view
+            today = date.today()
+            plan(grounded=True, tasks=120,
+                 days=(date(today.year + (today.month == 12),
+                            (today.month % 12) + 1, 1) - date(today.year, today.month, 1)).days,
+                 seed=42, time_limit=DEFAULT_UI_BUDGET,
+                 horizon_start=date(today.year, today.month, 1).isoformat())
             log.info("warm cache ready for the default view")
         except Exception as exc:  # noqa: BLE001
             log.warning("cache warming failed: %s", exc)
@@ -88,7 +92,16 @@ app = FastAPI(
 # train-hours against 280 at 30s — the extra 20 seconds wanders and finds
 # nothing better, because the search is not monotone under a time limit. The
 # warm start does most of the work in milliseconds; the solver refines it.
-DEFAULT_UI_BUDGET = 10.0
+DEFAULT_UI_BUDGET = float(os.environ.get("SOLVER_TIME_LIMIT", "10"))
+
+# Whether this process may build and run the CP-SAT model at all.
+#
+# A month-long instance needs 700 MB to 1.9 GB to solve — measured — against
+# 512 MB on a small cloud plan, so a container is killed mid-request. Plans
+# are therefore solved once at image-build time (scripts/precompute.py) and
+# served from the cache; when something is missed, the greedy schedule is
+# built instead, which costs 147 MB and still returns a real plan.
+ALLOW_RUNTIME_SOLVE = os.environ.get("ALLOW_RUNTIME_SOLVE", "1") != "0"
 
 LOCAL_ORIGINS = [
     "http://localhost:3000", "http://127.0.0.1:3000",
@@ -259,6 +272,22 @@ def instance_summary(
     }
 
 
+@functools.lru_cache(maxsize=4)
+def _cheap_plan(grounded: bool, tasks: int, days: int, seed: int,
+                percentile: float, start: date):
+    """A planner that never builds the CP-SAT model.
+
+    Same windows and traffic, no solver — for hosts that cannot hold the
+    model in memory.
+    """
+    instance = _load(grounded, tasks, days, seed, start)
+    _, _, scores = _criticality(grounded, tasks, days, seed, start)
+    planner = BlockPlanner(
+        instance, percentile=percentile, criticality=scores, build_model=False
+    )
+    return instance, planner, scores
+
+
 @functools.lru_cache(maxsize=8)
 def _plan(grounded: bool, tasks: int, days: int, seed: int, time_limit: float,
           percentile: float, start: date):
@@ -290,9 +319,19 @@ def plan(
     if cached is not None:
         return cached
 
-    instance, planner, solution, scores = _plan(
-        grounded, tasks, days, seed, time_limit, percentile, start
-    )
+    if ALLOW_RUNTIME_SOLVE:
+        instance, planner, solution, scores = _plan(
+            grounded, tasks, days, seed, time_limit, percentile, start
+        )
+    else:
+        # Not enough memory here to hold the model. Build the greedy schedule
+        # instead of being OOM-killed, and label it so nobody mistakes it for
+        # an optimised plan.
+        instance, planner, scores = _cheap_plan(
+            grounded, tasks, days, seed, percentile, start
+        )
+        solution = planner.greedy_only()
+        log.info("runtime solving disabled; served a greedy plan for %s", start)
     tasks_by_id = {t.id: t for t in instance.tasks}
 
     blocks = []

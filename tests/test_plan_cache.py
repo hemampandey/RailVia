@@ -75,3 +75,31 @@ def test_clear_removes_entries():
         cache.store(cache.key(tasks=i), {"i": i})
     assert cache.clear() == 3
     assert cache.load(cache.key(tasks=0)) is None
+
+
+def test_precompute_uses_the_api_budget_by_default():
+    """The cache is keyed on the solver budget, so precomputing at a
+    different one writes entries the server never looks up.
+
+    This bit once: precompute defaulted to 30s while the API asked for 10s,
+    so every precomputed plan was invisible.
+    """
+    import pathlib
+
+    from src.api.app import DEFAULT_UI_BUDGET
+
+    # Read the file rather than importing it: scripts/ is a directory of entry
+    # points, not a package, and making it importable just for a test would
+    # give it package semantics it does not want.
+    source = (pathlib.Path(__file__).resolve().parents[1]
+              / "scripts" / "precompute.py").read_text()
+    assert "DEFAULT_UI_BUDGET" in source, (
+        "precompute must default to the API's budget, not its own"
+    )
+    assert isinstance(DEFAULT_UI_BUDGET, float)
+
+
+def test_cache_key_includes_the_budget():
+    """Two budgets are two different plans and must not share an entry."""
+    base = dict(grounded=True, tasks=120, days=31, seed=42, horizon_start="2026-08-01")
+    assert cache.key(**base, time_limit=10.0) != cache.key(**base, time_limit=30.0)

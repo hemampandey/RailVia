@@ -464,3 +464,38 @@ def test_solving_honours_an_explicit_worker_count():
     instance = build_instance({"S1": NIGHT_SPARSE}, [task("T1", "S1", 60)])
     solution = BlockPlanner(instance, time_limit=10).solve(workers=1)
     assert solution.feasible
+
+
+def test_planner_can_skip_building_the_model():
+    """Constructing the CP-SAT model is what costs the memory.
+
+    A month-long instance needs 700 MB to 1.9 GB to solve, against 512 MB on
+    a small cloud plan. Skipping the model build drops the peak to ~150 MB and
+    still returns a real schedule.
+    """
+    instance = build_instance(
+        {"S1": NIGHT_SPARSE, "S2": NIGHT_SPARSE},
+        [task(f"T{i}", "S1" if i % 2 else "S2", 60, dept=list(Department)[i % 3])
+         for i in range(6)],
+        horizon_days=4,
+    )
+    planner = BlockPlanner(instance, build_model=False)
+    assert planner.model_built is False
+    assert planner.block_vars == {}, "the model was built anyway"
+
+    solution = planner.greedy_only()
+    assert solution.blocks
+    assert solution.status == "SKIPPED+GREEDY"
+    assert solution.scheduled_count > 0
+    for block in solution.blocks:
+        permitted = planner.permitted[block.section_id]
+        assert all(permitted[s] for s in range(block.start_slot, block.end_slot))
+
+
+def test_model_free_planner_still_explains_crew_limits():
+    """The exception messages read crew_ceiling, which is normally filled in
+    while building the crew constraint."""
+    instance = build_instance({"S1": NIGHT_SPARSE}, [task("T1", "S1", 60)])
+    planner = BlockPlanner(instance, build_model=False)
+    assert planner.crew_ceiling
+    assert all(v >= 0 for v in planner.crew_ceiling.values())

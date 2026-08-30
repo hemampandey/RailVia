@@ -268,7 +268,15 @@ These are compiled into the front end at build time, so changing them needs a
 redeploy rather than a restart. Both are safe to expose: the anon key is
 designed for browsers, and row-level security is what protects the data.
 
-**Memory is the thing that bites.** Each CP-SAT worker holds its own copy of
+**The container does not solve.** A month-long instance needs 700 MB to
+1.9 GB to build and solve the CP-SAT model — measured on 39 sections with 120
+tasks — against 512 MB on a small instance. So plans are solved once at
+image-build time by `scripts/precompute.py` and served from the cache, and
+`ALLOW_RUNTIME_SOLVE=0` stops the container attempting one. A month nobody
+precomputed falls back to the greedy schedule: 263 MB, about a second, and a
+real plan rather than an OOM kill.
+
+**Worker count still matters where solving does happen.** Each CP-SAT worker holds its own copy of
 the search state, so worker count is a memory setting as much as a speed one.
 Measured on the 120-task instance:
 

@@ -162,6 +162,7 @@ class BlockPlanner:
         enforce_deadlines: bool = True,
         late_penalty_per_day: int = DEFAULT_LATE_PENALTY_PER_DAY,
         with_objective: bool = True,
+        build_model: bool = True,
     ) -> None:
         self.instance = instance
         self.percentile = percentile
@@ -188,7 +189,31 @@ class BlockPlanner:
         self.model = cp_model.CpModel()
         self._hint_applied = False
         self.greedy = None
-        self._build()
+        self.model_built = build_model
+        if build_model:
+            self._build()
+        else:
+            # Windows and traffic only. Constructing the CP-SAT model costs
+            # hundreds of megabytes on a month-long instance, and a container
+            # that only ever serves precomputed plans must never pay it.
+            self.task_start = {}
+            self.task_end = {}
+            self.task_present = {}
+            self.task_interval = {}
+            self.assign = {}
+            self.block_vars = {}
+            self.late_days_var = {}
+            self.late_ceiling = {}
+            self.impossible = []
+            # Callers read this to explain why a job could not be placed, and
+            # it is normally populated while building the crew constraint.
+            self.crew_ceiling = {
+                dept: max(
+                    (c.available_crews for c in instance.crew_capacity
+                     if c.department == dept), default=0,
+                )
+                for dept in Department
+            }
 
     # -- helpers -------------------------------------------------------------
 
@@ -492,6 +517,17 @@ class BlockPlanner:
         self.model.Minimize(sum(terms))
 
     # -- solve ---------------------------------------------------------------
+
+    def greedy_only(self) -> Solution:
+        """A schedule without building or running the solver.
+
+        For hosts too small to hold the CP-SAT model. Quality is the greedy's,
+        and the status says so.
+        """
+        from src.optimiser.warmstart import build_greedy
+
+        self.greedy = build_greedy(self)
+        return self._solution_from_greedy("SKIPPED", 0.0)
 
     def _solution_from_greedy(self, status_name: str, wall: float) -> Solution:
         """Turn the warm-start schedule into a Solution.
