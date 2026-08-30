@@ -29,6 +29,13 @@ RUN npm run build
 # ── run the API, serving that UI ────────────────────────────────────────
 FROM python:3.13-slim
 
+# Hugging Face Spaces runs the container as user 1000 against an image built
+# by root, so anything the app writes — the plan cache above all — has to be
+# owned by that user. Creating the user here rather than chowning afterwards
+# keeps the image small: a recursive chown copies every file it touches into
+# a new layer.
+RUN useradd -m -u 1000 app
+
 WORKDIR /app
 
 # libgomp1 is the OpenMP runtime. LightGBM, and parts of SciPy and
@@ -43,18 +50,20 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ src/
+COPY --chown=app:app src/ src/
 # The RailRadar responses and derived sections, committed deliberately so a
 # deployment reproduces the same numbers with no API key and no network.
-COPY data/cache/railradar/ data/cache/railradar/
-COPY data/grounded_sections.json data/
-COPY --from=ui /ui/out/ web/out/
+COPY --chown=app:app data/cache/railradar/ data/cache/railradar/
+COPY --chown=app:app data/grounded_sections.json data/
+COPY --chown=app:app --from=ui /ui/out/ web/out/
+COPY --chown=app:app scripts/ scripts/
 
 ENV PYTHONUNBUFFERED=1
 # Two CP-SAT workers. This is a memory limit, not a speed one: the solve
 # peaks at 369 MB with 2 workers and 651 MB with 8, and a 512 MB container
 # is killed well before that. Two also scored best on plan quality.
 ENV SOLVER_WORKERS=2
+USER app
 EXPOSE 7860
 
 # One worker. Each holds its own solved-plan cache, and CP-SAT already uses

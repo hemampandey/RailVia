@@ -262,15 +262,22 @@ The most generous free option, and Docker-native.
 1. Create a **Space** → SDK **Docker** → Blank
 2. Push this repository to it — the YAML at the top of this README is the
    Space's own configuration, so nothing else is needed
-3. Settings → **Variables and secrets**, add:
+3. Settings → **Variables and secrets**, add both as **Variables**, not
+   secrets:
 
 | Name | |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | your project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your anon key |
 
-Add them as **secrets** so they reach the Docker build; the front end is
-compiled with them, so a change needs a rebuild rather than a restart.
+**Variables, not secrets** — Spaces passes Variables to the Docker build as
+`build-arg`s, which is what the `ARG` lines in the Dockerfile read. Secrets
+are deliberately *not* passed that way; they have to be mounted explicitly
+per command. The front end is compiled with these values, so they must be
+available at build time, and a change needs a rebuild rather than a restart.
+
+Both are safe as Variables: the anon key is designed to sit in a browser, and
+row-level security is what protects the data.
 
 The container listens on 7860, which is what Spaces expects. Render and Fly
 set `PORT` themselves and that wins, so the same image serves all three.
