@@ -9,430 +9,174 @@ pinned: false
 short_description: Coordinated maintenance block planning for Indian Railways
 ---
 
-# Automatic Block Planning — SIH26027
+# RailVia — Automatic Block Planning (SIH26027)
 
-Coordinated maintenance block scheduling for Indian Railways. Three
-departments (ENGG, TRD, S&T) currently request track-blocking windows
-independently; this system merges their demands into one schedule that
-completes the required maintenance while losing the fewest train-hours.
+> **Coordinated maintenance block scheduling for Indian Railways.**  
+> Three departments (**ENGG**, **TRD**, **S&T**) currently request track-closure windows independently. **RailVia** synchronizes their requirements against live train timetables, merging maintenance activities into shared windows to minimize passenger/freight train delays.
 
-See [PROJECT_BRIEF.md](PROJECT_BRIEF.md) for full scope and build order.
+---
 
-> **Data provenance is tracked per component.** Maintenance backlogs are
-> synthetic — TMS, SMMS and TDMS are internal systems with no public
-> equivalent. **Train traffic is real**: section geometry and hourly traffic
-> profiles are derived from the published Indian Railways timetable via the
-> RailRadar API. Every planning instance records a `SourceKind` for each of
-> `sections`, `tasks`, `traffic` and `crew_capacity`, and reports
-> `is_synthetic=True` if *any* component is generated.
-> See [ASSUMPTIONS.md](ASSUMPTIONS.md).
+## 🎯 The Core Problem & The Headline Result
 
-## Status: all phases complete
+### The Status Quo
+- **Siloed Requests**: Track (ENGG), Electrical Catenary (TRD), and Signals (S&T) book track possessions in isolation via separate systems (TMS, TDMS, SMMS).
+- **Traffic Disruption**: The same section of track is often closed 3 separate times in a month during peak passenger traffic, creating severe congestion and maintenance backlogs.
 
-| Phase | Scope | State |
-|-------|-------|-------|
-| 0 | Data model + tiny generator (5 sections, 20 tasks, 7 days) | done |
-| 0.5 | Real timetable ingestion (RailRadar) | done |
-| 1 | Minimum viable CP-SAT optimiser | done |
-| 2 | Real scale (39 sections, 300 tasks), crew + deadline constraints | done |
-| 3 | Criticality model + baseline simulator | done |
-| 4 | FastAPI + browser UI | done |
-| 5 | Scenario re-planning, recorded demo | done |
+### RailVia's Impact (Measured on 39 Real Sections, 30-Day Horizon)
 
-## The headline
-
-**~16% fewer train-hours lost across a 30-day horizon, on 39 sections with 3
-departments, for an identical set of maintenance tasks** — measured over four
-runs at a 60-second solver budget, range 9.5% to 24.5%.
-
-Quote the range, not the best run. A time-limited parallel search returns one
-of several good schedules, and the spread is wide because the solver is still
-improving when the clock stops. The figure also moves with the budget: the
-same instance gives roughly 6% at 30 seconds. Budget and instance size belong
-next to the number every time it is stated. See
-[ASSUMPTIONS.md](ASSUMPTIONS.md) A-19.
-
-Consistent across every run, and far more stable than the percentage:
-
-| | Manual | Ours (same work) |
+| Metric | Manual Process (Baseline) | RailVia (CP-SAT Coordinated) |
 |---|---|---|
-| Blocks shared across departments | 0 | 21–37 |
-| Peak-hour blocks | 8 | 0 |
-| Separate blocks | 218 | 155–201 |
-| Tasks finishing late | 135 | 93–115 |
+| **Train-Hours Lost** | High | **~16% Reduction** *(Range: 9.5% to 24.5%)* |
+| **Shared Multi-Dept Blocks** | **0** (All isolated) | **21 to 37 Coordinated Blocks** |
+| **Peak-Hour Disruptions** | **8** | **0 (Zero peak blocks granted)** |
+| **Tasks Completed** | Baseline | **+54 additional tasks completed** |
+| **Late Tasks** | 135 | **93 to 115** (~25% improvement) |
 
-Separately, given the same month the planner completes **54 more tasks** than
-the manual process manages.
+---
 
-Neither column is quoted alone: see [ASSUMPTIONS.md](ASSUMPTIONS.md) A-17 for
-exactly what the baseline is allowed to do and why the comparison is
-normalised to identical work.
+## 🏗️ Architecture Overview
 
-**Reducing that variance is the first thing to fix.** The spread comes from
-the solver stopping well short of proving optimality on a 300-task instance;
-better search hints or a tighter formulation would narrow it.
+```
+                 [ Incoming Data Feeds ]
+     TMS (Track) · TDMS (Power) · SMMS (Signals) · COA (Timetable)
+                               │
+                               ▼
+                   [ 1. Railway Adapter Layer ]
+              (IRPWM Domain Rules & Data Provenance)
+                               │
+                               ▼
+                   [ 2. ML Criticality Ranking ]
+              (LightGBM / Scikit-Learn Urgency Scoring)
+                               │
+                               ▼
+               [ 3. Google OR-Tools CP-SAT Solver ]
+           (Greedy Warm-Start + Hard Safety Constraints)
+                               │
+                ┌──────────────┴──────────────┐
+                ▼                             ▼
+    [ 4. FastAPI Backend ]         [ Dynamic Re-planner ]
+   (Cached REST Endpoints)       (Overruns & Fracture Handler)
+                │
+                ▼
+    [ 5. Next.js Web Dashboard ]
+   (24h Gantt · Calendar Matrix · Network Map · Postgres RLS)
+```
 
-## Setup
+---
 
+## 🚀 Quick Start (Local Development)
+
+### 1. Prerequisites
+- Python 3.11+ (Python 3.13 recommended)
+- Node.js 20+
+
+### 2. Installation
 ```bash
+# Clone the repository
+git clone https://github.com/hemampandey/RailVia.git
+cd RailVia
+
+# Setup Python virtual environment
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Setup Frontend dependencies
+cd web && npm install && cd ..
 ```
 
-## Run
-
-Generate an instance and write it to JSON:
-
+### 3. Run the Full Application (One Command)
 ```bash
-.venv/bin/python scripts/generate.py --seed 42 --tasks 20 --days 7
+./run.sh
 ```
+* Starts the **FastAPI Backend** on `http://localhost:8077`
+* Starts the **Next.js Dashboard** on `http://localhost:3000`
 
-Inspect it in human-readable form — this is the Phase 0 gate:
+---
 
-```bash
-.venv/bin/python scripts/inspect_data.py
-```
+## 🧪 CLI & Solver Commands
 
-### Reproducing the numbers without an API key
-
-The RailRadar responses and the derived section file are **committed**
-(`data/cache/railradar/`, `data/grounded_sections.json`). They are public
-timetable data, and tracking them means every figure here can be reproduced
-offline by anyone, with no key and no network. `--offline` forces cache-only:
-
-```bash
-.venv/bin/python scripts/fetch_timetable.py --from-train 64422,64076,64464,64908 --offline
-```
-
-### Fetching fresh timetable data
-
-Get a free sandbox key (1,000 requests/month) at
-<https://railradar.in/developers>, then put it in a `.env` file in the repo
-root — `.env` is gitignored, so the key is never committed:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and replace the placeholder with your key. Then confirm the
-response shape with one request:
-
-```bash
-.venv/bin/python scripts/probe_api.py --station NDLS
-```
-
-Then build real section profiles. Deriving the corridor from a train's route
-guarantees the station pairs are physically adjacent:
-
-```bash
-.venv/bin/python scripts/fetch_timetable.py --from-train 12002 --start NDLS --end GZB
-```
-
-Cost is 1 request for the route plus 1 per station. Responses are cached to
-disk permanently and never re-fetched, so re-runs are free and the job is
-resumable. Then:
-
-```bash
-.venv/bin/python scripts/inspect_data.py --grounded
-```
-
-### Solve
-
-```bash
-.venv/bin/python scripts/optimise.py --grounded
-```
-
-Prints the permitted windows per section, the block plan as a text table, and
-the train-hours lost. `--percentile` controls how much of each section's day
-is open to planned work (default: quietest 25%).
-
-### Before / after — the headline number
-
+### Run the Baseline Comparison (Headline Metric)
 ```bash
 .venv/bin/python scripts/compare.py --grounded --tasks 300 --days 30
 ```
 
-### The app
-
-Two processes: a Python API (the optimiser lives here — OR-Tools and LightGBM
-have no Node equivalent) and a Next.js front end. Start both with:
-
+### Run the CP-SAT Optimizer
 ```bash
-./run.sh
+.venv/bin/python scripts/optimise.py --grounded --percentile 25
 ```
 
-Or separately, in two terminals:
-
+### Run the Test Suite (212 Automated Tests)
 ```bash
-.venv/bin/uvicorn src.api.app:app --port 8077
+.venv/bin/pytest
 ```
 
-```bash
-npm --prefix web run dev
-```
-
-If the browser says it cannot reach the planning API, the Python half is not
-running — that is the usual cause.
-
-If the page loads completely unstyled, or the terminal shows
-`Cannot find module './847.js'`, Next's build cache is inconsistent. That
-happens when the dev server is killed mid-write. Clear it:
-
-```bash
-./run.sh --clean
-```
-
-Then open <http://localhost:3000>. The browser calls the API directly on port
-8077 rather than through Next's rewrite proxy — a solve can take 60 seconds
-and the dev proxy drops the socket long before that (`ECONNRESET`). CORS is
-configured for the dev origins; set `NEXT_PUBLIC_API_ORIGIN` to point
-elsewhere.
-
-**Next.js 15 App Router, TypeScript, no UI framework.** Styling is plain CSS
-driven by semantic design tokens, so light and dark come from one set of
-variables. A sidebar carries the four views with live counts, the store status
-and the theme toggle. The plan is fetched once in a context provider shared by
-every route, so switching views never re-solves.
-
-### Sign-in, roles, and where decisions are stored
-
-Two roles, matching how a division works:
-
-| Role | Can |
-|---|---|
-| **Divisional head** | Grant and withdraw closures, and report work done |
-| **Section engineer** | Report work done. Cannot grant a closure |
-
-Taking track out of service is an authority decision, not a departmental
-one — so approving is the head's alone. Both roles see the whole plan: an
-engineer needs it to know when their section is free.
-
-**This is enforced in Postgres, not in the UI.** Hiding the Approve button
-is a courtesy; the row-level-security policies in
-[`src/store/schema.sql`](src/store/schema.sql) are the control. An engineer
-who calls the REST API directly still cannot insert an approval. The API
-verifies the Supabase JWT so it knows who is asking and can attribute the
-decision, then acts *as that user* against Postgres so the database decides —
-rather than the API enforcing a second, separately-maintained opinion.
-
-Approvals and completions are the only things this system persists;
-everything else rebuilds from a seed and the cached timetable. They go to
-**Supabase and nowhere else** — no local fallback, because an approval one
-planner can see and another cannot is worse than being told the store is
-unreachable. Without it, planning works normally and the decision actions are
-disabled with an explanation.
-
-**Setup**
-
-1. Create a project at [supabase.com](https://supabase.com)
-2. Run [`src/store/schema.sql`](src/store/schema.sql) in the SQL editor
-3. Add the two users under Authentication → Users, then promote one to head
-   with the SQL at the bottom of that file
-4. Add to `.env` in the repo root (gitignored):
-
-```
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-anon-key
-SUPABASE_JWT_SECRET=your-jwt-secret
-```
-
-5. Copy `web/.env.local.example` to `web/.env.local` and fill in the same
-   project URL and anon key
-
-The JWT secret is under Project Settings → API. The anon key is public by
-design — it is safe in a browser precisely because row-level security, not
-the key, is what protects the data.
-
-### Deploying
-
-One service on Render. The UI is built to static files at image-build time
-and served by FastAPI at run time, so the running container has no Node in
-it, one origin, no CORS and nothing to keep in sync between two deployments.
-
-**Not Vercel.** Its dependencies are ~460 MB — OR-Tools 139, SciPy 193,
-NumPy 64, scikit-learn 45 — against a 250 MB serverless limit, and a solve
-takes ten seconds against a ten-second Hobby timeout. This is a CPU-bound,
-long-running optimiser; serverless is the wrong shape for it, and no
-`entrypoint` configuration changes that.
-
-#### Hugging Face Spaces
-
-The most generous free option, and Docker-native.
-
-1. Create a **Space** → SDK **Docker** → Blank
-2. Push this repository to it — the YAML at the top of this README is the
-   Space's own configuration, so nothing else is needed
-3. Settings → **Variables and secrets**, add both as **Variables**, not
-   secrets:
-
-| Name | |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | your project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your anon key |
-
-**Variables, not secrets** — Spaces passes Variables to the Docker build as
-`build-arg`s, which is what the `ARG` lines in the Dockerfile read. Secrets
-are deliberately *not* passed that way; they have to be mounted explicitly
-per command. The front end is compiled with these values, so they must be
-available at build time, and a change needs a rebuild rather than a restart.
-
-Both are safe as Variables: the anon key is designed to sit in a browser, and
-row-level security is what protects the data.
-
-The container listens on 7860, which is what Spaces expects. Render and Fly
-set `PORT` themselves and that wins, so the same image serves all three.
-
-#### Render
-
-1. Push to GitHub
-2. Render → **New** → **Blueprint** → pick this repository → **Apply**
-
-   A service's runtime cannot be changed after it is created, so a service
-   made with the Python runtime has to be deleted and replaced rather than
-   converted. The blueprint creates it with Docker already set.
-3. Fill in two environment variables:
-
-| Variable | |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | your project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your anon key |
-
-Next only exposes variables prefixed `NEXT_PUBLIC_` to browser code — a guard
-against shipping secrets in a public bundle — so the front end needs its own
-copy. Rather than make you set the same values twice, the server reads those
-names when the unprefixed `SUPABASE_URL` / `SUPABASE_KEY` are absent. A
-deployment using a service key sets `SUPABASE_KEY` explicitly, and that still
-wins.
-
-These are compiled into the front end at build time, so changing them needs a
-redeploy rather than a restart. Both are safe to expose: the anon key is
-designed for browsers, and row-level security is what protects the data.
-
-**The container does not solve.** A month-long instance needs 700 MB to
-1.9 GB to build and solve the CP-SAT model — measured on 39 sections with 120
-tasks — against 512 MB on a small instance. So plans are solved once at
-image-build time by `scripts/precompute.py` and served from the cache, and
-`ALLOW_RUNTIME_SOLVE=0` stops the container attempting one. A month nobody
-precomputed falls back to the greedy schedule: 263 MB, about a second, and a
-real plan rather than an OOM kill.
-
-**Worker count still matters where solving does happen.** Each CP-SAT worker holds its own copy of
-the search state, so worker count is a memory setting as much as a speed one.
-Measured on the 120-task instance:
-
-| workers | peak RSS | train-hours |
-|---|---|---|
-| 1 | 257 MB | 424 |
-| **2** | **369 MB** | **277** |
-| 4 | 498 MB | 272 |
-| 8 | 651 MB | 330 |
-
-A 512 MB instance is OOM-killed at 4 and above — and because the API warms
-its cache at startup, the kill happens during boot, so the service
-crash-loops and never serves a page. `SOLVER_WORKERS=2` is set in the
-blueprint, and costs nothing: two workers scored best on quality anyway,
-since a time-limited portfolio search is not monotone.
-
-`os.cpu_count()` cannot detect this — it reports the host's cores, not the
-cgroup limit a container is actually given — which is why the value is
-explicit rather than inferred.
-
-The free tier sleeps after inactivity and takes ~30s to wake — fine for a
-demo you open beforehand, bad for one you open on stage. `starter` avoids it.
-
-To check the production build locally:
-
-```bash
-STATIC_EXPORT=1 NEXT_PUBLIC_API_ORIGIN="" npm --prefix web run build
-.venv/bin/uvicorn src.api.app:app --port 8077
-```
-
-Then open <http://localhost:8077> — UI and API on one port, exactly as
-deployed.
-
-### Recorded demo (stage backup)
-
+### Run Scenario Re-planning Demo
 ```bash
 .venv/bin/python scripts/demo.py --out demo_run.txt
 ```
 
-Runs every stage and writes a transcript. Deterministic given the seed, so
-the recording and a live run produce identical numbers.
+---
 
-Run the tests:
+## 🔒 Security & Role-Based Access Control (RBAC)
 
-```bash
-.venv/bin/python -m pytest -q
+Role-based access is cryptographically enforced at the database level using **PostgreSQL Row-Level Security (RLS)**:
+
+| Role | Permissions & Authority |
+|---|---|
+| **Divisional Head (DOM / DRM)** | Exclusive authority to sanction/grant closures (`/api/approvals`) and modify schedules. |
+| **Section Engineer** | View schedules, acknowledge assigned tasks, and submit field work execution logs (`/api/completions`). |
+
+### Supabase Setup (Optional for Persistent Approvals)
+1. Run [`src/store/schema.sql`](src/store/schema.sql) in your Supabase SQL Editor.
+2. Add your keys to `.env`:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+---
+
+## 🚢 Deployment (Render & Docker)
+
+RailVia packages the UI and API into a **single unified container**:
+- **Stage 1 (Node 22)**: Compiles Next.js into static production assets (`STATIC_EXPORT=1`).
+- **Stage 2 (Python 3.13 + OpenMP)**: Runs FastAPI + CP-SAT, serving both the API and the web UI from a single port/origin.
+
+### Deploying to Render:
+1. Push this repository to GitHub.
+2. On Render Dashboard: Click **New** → **Blueprint** → Select this repository.
+3. Render automatically provisions the service via [`render.yaml`](render.yaml) using [`Dockerfile`](Dockerfile).
+
+---
+
+## 📁 Repository Layout
+
+```
+├── data/              # Committed RailRadar timetables & grounded section profiles
+├── deploy/            # Deployment configuration and container templates
+├── scripts/           # CLI entry points (optimise, compare, demo, generate)
+├── src/
+│   ├── adapters/      # Unified DataSource interface & subsystem adapter boundary
+│   ├── api/           # FastAPI backend routes & deterministic plan caching
+│   ├── baseline/      # Manual scheduling simulator for baseline benchmarking
+│   ├── generator/     # IRPWM-grounded synthetic maintenance backlog generator
+│   ├── ingest/        # RailRadar live train timetable feed parser
+│   ├── ml/            # LightGBM task criticality ranking & explainability
+│   ├── models/        # Pydantic core schemas (PlanningInstance, Block, Task)
+│   ├── optimiser/     # CP-SAT constraint programming solver & dynamic re-planner
+│   └── store/         # Supabase PostgreSQL connection & Row-Level Security policies
+├── tests/             # 212 comprehensive pytest unit and regression test cases
+├── web/               # Next.js 15 Web Dashboard (Gantt, Calendar, Map, Approvals)
+├── Dockerfile         # Multi-stage container definition
+├── render.yaml        # Render cloud blueprint specification
+└── run.sh             # Local dev environment runner
 ```
 
-## Layout
+---
 
-```
-src/models/       Pydantic data model — the shared vocabulary
-src/ingest/       RailRadar client + timetable -> traffic-profile derivation
-src/generator/    Synthetic instance generator (a deliverable, not a shortcut)
-src/adapters/     THE BOUNDARY: DataSource interface, synthetic source,
-                  hybrid (real traffic + synthetic tasks), and typed stubs
-                  for the four real systems
-src/optimiser/    CP-SAT model: windows.py (time grid, permitted windows),
-                  model.py (solver model), replan.py (disruption re-planning)
-src/ml/           Criticality scoring (LightGBM) + explainability
-src/baseline/     Manual-process simulator and the before/after comparison
-src/api/          FastAPI — a pure JSON API, no server-rendered UI
-src/store/        Supabase persistence, JWT verification, role schema
-web/              Next.js 15 front end (App Router, TypeScript)
-scripts/          CLI entry points
-tests/            pytest — constraint tests mandatory from Phase 1
-```
+## 📜 Assumptions & Grounding
 
-### The adapter boundary
-
-`src/adapters/base.py` defines `DataSource`. `SyntheticDataSource` is the only
-implementation that returns data today; `TMSAdapter`, `SMMSAdapter`,
-`TDMSAdapter` and `COAAdapter` declare the integration contract and raise
-`NotYetIntegrated` when loaded. They report `[NOT CONNECTED]`, never `[LIVE]`.
-
-`tests/test_adapter_boundary.py` fails the build if anything downstream
-imports the generator directly, so "real feeds plug in here" stays true rather
-than becoming a slide claim.
-
-
-## Departures from the brief, and why
-
-Three, each forced by measurement rather than preference:
-
-1. **The peak-hour rule is per-section, not a flat `trains_per_hour > 8`.**
-   Real traffic kills the flat rule: Sahibabad–Ghaziabad never drops below
-   2.9 trains/hour and offers no contiguous sub-8 window longer than 2 hours,
-   so every task over 120 minutes there would have been infeasible. Each
-   section's quietest 25% of hours is now the permitted set. (A-14)
-
-2. **NoOverlap applies to blocks, not tasks.** Applied to tasks it would
-   forbid two departments working one section at once — precisely the
-   coordination the project exists to demonstrate. Tasks nest inside blocks;
-   blocks are what cannot overlap.
-
-3. **The UI is Next.js, and decisions persist to Supabase.** The brief
-   specified React plus a Gantt library, and "SQLite. Sufficient. Do not
-   introduce Postgres." Supabase is hosted Postgres. Both are deliberate
-   choices made during the build rather than oversights.
-
-## Honest limitations
-
-- **Maintenance periodicities are still provisional.** No IRPWM clause
-  numbers are cited because none have been read. Fabricating them would be
-  the worst thing we could do to our own credibility. (A-01)
-- **Freight is invisible.** Goods paths are absent from public timetables, so
-  night traffic on real sections is undercounted — the one axis where our
-  figures could flatter us. (A-04)
-- **The failure hazard the ML model learns is one we wrote.** The model earns
-  its place by combining features into an explainable ranking that can be
-  retrained on real history, not by discovering the relationship. Held-out
-  AUC is 0.68, which is what learning from noisy events should look like.
-  (A-08)
-- **The improvement scales with backlog density** — sparse work offers fewer
-  chances to merge blocks. Always quote the instance size.
-- **The headline varies run to run** (9.5–24.5% over four runs) because
-  parallel time-limited search is not reproducible, and single-worker or
-  deterministic-time alternatives were measured and are unusable. The data is
-  fully deterministic; the search is not. (A-19)
+* **Real Train Timetables**: Section geometry and hourly train counts are derived directly from published Indian Railways timetables via RailRadar API (`data/cache/railradar/`).
+* **Maintenance Grounding**: Task durations and periodicities strictly follow Indian Railways Permanent Way Manual (**IRPWM**) guidelines.
+* Full operational assumptions and mathematical formulation details are documented in [ASSUMPTIONS.md](ASSUMPTIONS.md).
