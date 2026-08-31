@@ -1,5 +1,21 @@
 export type Dept = "ENGG" | "TRD" | "S&T";
 
+export interface Division {
+  id: string;
+  name: string;
+  zone: string;
+  sectionsCount: number;
+}
+
+export const DIVISIONS: Division[] = [
+  { id: "DLI", name: "Delhi", zone: "Northern Railway (NR)", sectionsCount: 39 },
+  { id: "UMB", name: "Ambala", zone: "Northern Railway (NR)", sectionsCount: 28 },
+  { id: "MB", name: "Moradabad", zone: "Northern Railway (NR)", sectionsCount: 34 },
+  { id: "MMCT", name: "Mumbai Central", zone: "Western Railway (WR)", sectionsCount: 42 },
+  { id: "HWH", name: "Howrah", zone: "Eastern Railway (ER)", sectionsCount: 45 },
+  { id: "SBC", name: "Bengaluru", zone: "South Western Railway (SWR)", sectionsCount: 30 },
+];
+
 export interface Job {
   id: string;
   activity: string;

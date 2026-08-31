@@ -7,8 +7,8 @@ import {
   approve as apiApprove, completeJob, DEFAULT_PARAMS, getDecisions, getPlan,
   getStore, PlanParams, unapprove as apiUnapprove, uncompleteJob,
 } from "@/lib/api";
-import type { Approval, Block, Completion, Plan, StoreStatus } from "@/lib/types";
-import { blockKey } from "@/lib/types";
+import type { Approval, Block, Completion, Division, Plan, StoreStatus } from "@/lib/types";
+import { blockKey, DIVISIONS } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 
 /** One provider for the whole app.
@@ -24,6 +24,8 @@ interface Ctx {
   approvals: Map<string, Approval>;
   completions: Map<string, Completion>;
   params: PlanParams;
+  division: Division;
+  setDivision: (d: Division) => void;
   loading: boolean;
   error: string | null;
   setParams: (p: Partial<PlanParams>) => void;
@@ -45,6 +47,7 @@ export const usePlanner = () => {
 export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const token = session?.access_token;
+  const [division, setDivision] = useState<Division>(DIVISIONS[0]);
   const [params, setParamsState] = useState<PlanParams>(DEFAULT_PARAMS);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [store, setStore] = useState<StoreStatus | null>(null);
@@ -131,10 +134,10 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   }, [plan, completions, token]);
 
   const value = useMemo<Ctx>(() => ({
-    plan, store, approvals, completions, params, loading, error,
+    plan, store, approvals, completions, params, division, setDivision, loading, error,
     setParams, reload: () => setTick((t) => t + 1),
     toggleApproval, toggleDone, isApproved, isDone,
-  }), [plan, store, approvals, completions, params, loading, error,
+  }), [plan, store, approvals, completions, params, division, setDivision, loading, error,
     setParams, toggleApproval, toggleDone, isApproved, isDone]);
 
   return (

@@ -7,7 +7,7 @@ import { Icon, PATH } from "./icons";
 import { ThemeToggle } from "./ThemeToggle";
 import { usePlanner } from "./PlannerProvider";
 import { useAuth } from "./AuthProvider";
-import { ROLE_LABEL } from "@/lib/types";
+import { ROLE_LABEL, DIVISIONS } from "@/lib/types";
 
 const NAV = [
   { href: "/calendar", label: "Calendar", icon: PATH.calendar },
@@ -19,7 +19,7 @@ const NAV = [
 
 export function Sidebar() {
   const path = usePathname();
-  const { plan, approvals, completions } = usePlanner();
+  const { plan, approvals, completions, division, setDivision } = usePlanner();
   const { me, session, signOut, error: authError } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -66,6 +66,45 @@ export function Sidebar() {
           <span aria-hidden="true">{collapsed ? "›" : "‹"}</span>
         </button>
       </div>
+
+      {/* Division Selector */}
+      {!collapsed ? (
+        <div className="division-picker">
+          <div className="division-picker-label">
+            <span className="dot-indicator" />
+            <span>Division</span>
+          </div>
+          <div className="division-select-wrap">
+            <select
+              value={division.id}
+              onChange={(e) => {
+                const found = DIVISIONS.find((d) => d.id === e.target.value);
+                if (found) setDivision(found);
+              }}
+              className="division-select"
+              aria-label="Select Railway Division"
+            >
+              {DIVISIONS.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.id})
+                </option>
+              ))}
+            </select>
+            <div className="division-select-arrow" aria-hidden="true">▾</div>
+          </div>
+          <div className="division-zone-info">
+            <span>{division.zone}</span>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="division-collapsed-chip"
+          title={`${division.name} (${division.id}) · ${division.zone}`}
+        >
+          {division.id}
+        </div>
+      )}
+
       <nav aria-label="Views">
         {NAV.map((item) => {
           const b = badge(item.href);

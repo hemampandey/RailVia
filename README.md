@@ -92,6 +92,21 @@ cd web && npm install && cd ..
 * Starts the **FastAPI Backend** on `http://localhost:8077`
 * Starts the **Next.js Dashboard** on `http://localhost:3000`
 
+### 4. Freeing / Killing Used Ports (Troubleshooting)
+If port `8077` or `3000` is already in use by a background process, free them with:
+
+```bash
+# Kill both backend (8077) and frontend (3000) processes on macOS/Linux
+lsof -ti :8077 -ti :3000 | xargs kill -9
+
+# Or kill individually:
+lsof -ti :8077 | xargs kill -9   # Kill FastAPI backend
+lsof -ti :3000 | xargs kill -9   # Kill Next.js frontend
+
+# Clear Next.js cache and restart cleanly:
+./run.sh --clean
+```
+
 ---
 
 ## 🧪 CLI & Solver Commands

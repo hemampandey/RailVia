@@ -10,7 +10,7 @@ import { DayDetailModal } from "@/components/DayDetailModal";
 import { DEPT_VAR, type Block, type Dept } from "@/lib/types";
 
 export default function CalendarPage() {
-  const { plan, loading, error, approvals, completions, isApproved } = usePlanner();
+  const { plan, loading, error, approvals, completions, isApproved, division } = usePlanner();
   const [selected, setSelected] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "gantt">("grid");
   const [deptFilter, setDeptFilter] = useState<Dept | "ALL">("ALL");
@@ -51,9 +51,9 @@ export default function CalendarPage() {
 
       <div className="brief">
         <div className="brief-top">
-          <h2>{heading} Overview</h2>
+          <h2>{heading} Overview — {division.name} Division</h2>
           <span style={{ fontSize: 13, color: "var(--text-faint)" }}>
-            Horizon: {plan.horizon_days} Days · {plan.task_total} Jobs Processed
+            {division.zone} · {division.sectionsCount} Sections · {plan.horizon_days} Days · {plan.task_total} Jobs
           </span>
         </div>
         <div className="kpi-grid">
