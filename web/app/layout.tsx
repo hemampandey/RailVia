@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./landing.css";
 import { AuthProvider } from "@/components/AuthProvider";
-import { LoginGate } from "@/components/LoginGate";
-import { PlannerProvider } from "@/components/PlannerProvider";
-import { Sidebar } from "@/components/Sidebar";
 
 export const metadata: Metadata = {
   title: "RailVia",
@@ -21,6 +19,10 @@ try {
 } catch (e) {}
 `;
 
+/* The root layout carries only what every page needs. The sign-in gate and
+   the planner shell moved into app/(app)/layout.tsx, so the landing page at
+   / can be read without an account — a judge should not have to sign in to
+   find out what this is. */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // suppressHydrationWarning: the boot script below sets data-theme on
@@ -30,21 +32,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;600&display=swap" />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
       <body>
-        <a className="skip" href="#main">Skip to content</a>
-        <AuthProvider>
-          <LoginGate>
-            <PlannerProvider>
-              <div className="shell">
-                <Sidebar />
-                <main className="content" id="main">{children}</main>
-              </div>
-            </PlannerProvider>
-          </LoginGate>
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

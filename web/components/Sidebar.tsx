@@ -10,7 +10,7 @@ import { useAuth } from "./AuthProvider";
 import { ROLE_LABEL } from "@/lib/types";
 
 const NAV = [
-  { href: "/", label: "Calendar", icon: PATH.calendar },
+  { href: "/calendar", label: "Calendar", icon: PATH.calendar },
   { href: "/plan", label: "Plan", icon: PATH.list },
   { href: "/map", label: "Map", icon: PATH.map },
   { href: "/approved", label: "Approved", icon: PATH.check },
@@ -32,7 +32,7 @@ export function Sidebar() {
    *  making anyone open each view to find out. */
   const badge = (href: string): { text: string; warn?: boolean } | null => {
     if (!plan) return null;
-    if (href === "/") return { text: String(plan.block_count) };
+    if (href === "/calendar") return { text: String(plan.block_count) };
     if (href === "/plan") {
       return plan.exceptions.length
         ? { text: String(plan.exceptions.length), warn: true }
