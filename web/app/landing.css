@@ -277,3 +277,32 @@
   .lp-anim .merge-out { opacity: 0; }
   .lp-anim .merge-in { opacity: 1; }
 }
+
+/* ── the line under possession ─────────────────────────────────────
+   A side elevation of what a closure actually is: rails, the overhead
+   line above them, a signal, and a train held at it. Each department's
+   equipment is on the same stretch, which is the page's whole argument
+   drawn rather than asserted. Line-art in the permanent-way-manual
+   register, not an illustration of a train. */
+.lp-scene {
+  margin-top: 44px;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  padding: 26px 28px 20px;
+}
+.lp-scene svg { display: block; width: 100%; height: auto; }
+/* Not overflow:hidden on the card — that clips the scroller inside it, so a
+   narrow screen showed the left third of the drawing with no way to reach
+   the rest. */
+.lp-scene .scene-scroll { overflow-x: auto; border-radius: 6px; }
+.lp-scene figcaption {
+  margin-top: 18px; padding-top: 14px;
+  border-top: 1px solid var(--lp-line-soft);
+  font-size: 14.5px; color: var(--lp-ink-2); line-height: 1.6; max-width: 70ch;
+}
+.lp-scene figcaption b { color: var(--lp-ink); font-weight: 600; }
+@media (max-width: 720px) {
+  .lp-scene { padding: 18px 14px 14px; }
+  .lp-scene svg { min-width: 640px; }
+}

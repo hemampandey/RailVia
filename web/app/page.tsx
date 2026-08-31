@@ -184,6 +184,141 @@ export default function Landing() {
               <div className="sys">defects in SMMS</div>
             </div>
           </div>
+
+          {/* ── what a closure actually is ──
+              Side elevation of one stretch of line: rails, the overhead
+              line above, a signal, and a train held at it. All three
+              departments' equipment sits on the same track — the page's
+              argument drawn rather than asserted. */}
+          <figure className="lp-scene">
+            <div className="scene-scroll">
+            <svg viewBox="0 0 900 268" role="img"
+                 aria-label="A stretch of railway under possession: a train held at a red signal on the left, and beyond it a closed section where the track, the overhead line and the signalling equipment all sit on the same rails.">
+              <defs>
+                <pattern id="ballast" width="7" height="7" patternUnits="userSpaceOnUse">
+                  <circle cx="1.5" cy="1.5" r="0.9" fill="var(--lp-line)" />
+                  <circle cx="5" cy="4.5" r="0.7" fill="var(--lp-line)" />
+                </pattern>
+              </defs>
+
+              {/* formation and ballast */}
+              <path d="M0 232 L900 232 L900 250 L0 250 Z" fill="url(#ballast)" />
+              <line x1="0" y1="232" x2="900" y2="232" stroke="var(--lp-line)" strokeWidth="1" />
+
+              {/* sleepers */}
+              <g stroke="var(--lp-steel)" strokeWidth="4" opacity="0.32">
+                {Array.from({ length: 44 }, (_, i) => (
+                  <line key={i} x1={12 + i * 20} y1="222" x2={12 + i * 20} y2="234" />
+                ))}
+              </g>
+
+              {/* the rails themselves — ENGG */}
+              <line x1="0" y1="220" x2="900" y2="220" stroke="var(--lp-engg)" strokeWidth="2.5" />
+              <line x1="0" y1="226" x2="900" y2="226" stroke="var(--lp-engg)" strokeWidth="1.6" opacity="0.5" />
+              {/* the rail lifted for work, inside the possession */}
+              <path d="M556 220 L586 206 L626 206 L656 220"
+                    fill="none" stroke="var(--lp-engg)" strokeWidth="2.5"
+                    strokeLinejoin="round" />
+
+              {/* overhead line equipment — TRD */}
+              <g stroke="var(--lp-trd)" strokeWidth="1.8" fill="none">
+                {[330, 500, 670, 840].map((x) => (
+                  <g key={x}>
+                    <line x1={x} y1="222" x2={x} y2="40" />
+                    <line x1={x} y1="40" x2={x - 34} y2="40" />
+                    <line x1={x - 34} y1="40" x2={x - 34} y2="56" />
+                  </g>
+                ))}
+                <line x1="0" y1="56" x2="900" y2="56" strokeWidth="2" />
+                <line x1="0" y1="40" x2="900" y2="40" strokeWidth="1" opacity="0.45" />
+              </g>
+
+              {/* signal at danger — S&T */}
+              <g>
+                <line x1="286" y1="222" x2="286" y2="120" stroke="var(--lp-snt)" strokeWidth="3" />
+                <rect x="272" y="96" width="28" height="30" rx="5"
+                      fill="var(--lp-surface)" stroke="var(--lp-snt)" strokeWidth="2" />
+                <circle cx="286" cy="111" r="7" fill="var(--lp-waste)" />
+              </g>
+
+              {/* possession limit boards */}
+              <g>
+                {[[352, "start"], [862, "end"]].map(([x]) => (
+                  <g key={String(x)}>
+                    <line x1={Number(x)} y1="222" x2={Number(x)} y2="168"
+                          stroke="var(--lp-ink-3)" strokeWidth="2" />
+                    <rect x={Number(x) - 15} y="150" width="30" height="20" rx="3"
+                          fill="var(--lp-waste)" />
+                  </g>
+                ))}
+                <line x1="352" y1="160" x2="862" y2="160" stroke="var(--lp-waste)"
+                      strokeWidth="1.4" strokeDasharray="7 5" />
+                <text x="607" y="146" textAnchor="middle" fontFamily="var(--lp-label)"
+                      fontSize="12.5" fontWeight="700" fill="var(--lp-waste)"
+                      letterSpacing="1.4">
+                  LINE BLOCKED
+                </text>
+              </g>
+
+              {/* the work party */}
+              <g stroke="var(--lp-ink-2)" strokeWidth="1.8" fill="none">
+                <circle cx="592" cy="186" r="5" />
+                <path d="M592 191 L592 204 M586 196 L598 196 M592 204 L587 214 M592 204 L597 214" />
+                <circle cx="628" cy="186" r="5" />
+                <path d="M628 191 L628 204 M622 197 L634 194 M628 204 L623 214 M628 204 L633 214" />
+                <line x1="634" y1="194" x2="644" y2="212" strokeWidth="2.2" />
+              </g>
+
+              {/* the train, held */}
+              <g>
+                {/* pantograph, down to the contact wire */}
+                <g stroke="var(--lp-trd)" strokeWidth="1.6" fill="none">
+                  <path d="M118 128 L100 88 L136 88 L118 128" />
+                  <line x1="92" y1="88" x2="146" y2="88" strokeWidth="2.4" />
+                </g>
+                {/* body */}
+                <path d="M24 214 L24 140 Q24 130 34 130 L212 130 Q226 130 234 142 L246 168 L246 214 Z"
+                      fill="var(--lp-surface)" stroke="var(--lp-ink)" strokeWidth="2.2"
+                      strokeLinejoin="round" />
+                {/* cab window and body glazing */}
+                <path d="M206 140 L226 140 Q232 140 236 148 L242 162 L206 162 Z"
+                      fill="var(--lp-rail-soft)" stroke="var(--lp-ink)" strokeWidth="1.6" />
+                <g fill="var(--lp-rail-soft)" stroke="var(--lp-ink)" strokeWidth="1.4">
+                  <rect x="44" y="146" width="30" height="20" rx="3" />
+                  <rect x="86" y="146" width="30" height="20" rx="3" />
+                  <rect x="128" y="146" width="30" height="20" rx="3" />
+                  <rect x="170" y="146" width="24" height="20" rx="3" />
+                </g>
+                {/* solebar */}
+                <line x1="24" y1="196" x2="246" y2="196" stroke="var(--lp-ink)" strokeWidth="1.4" />
+                {/* bogies */}
+                <g fill="var(--lp-surface)" stroke="var(--lp-ink)" strokeWidth="2">
+                  <circle cx="62" cy="212" r="10" />
+                  <circle cx="94" cy="212" r="10" />
+                  <circle cx="180" cy="212" r="10" />
+                  <circle cx="212" cy="212" r="10" />
+                </g>
+                {/* headlight, lit but going nowhere */}
+                <circle cx="240" cy="176" r="3.5" fill="var(--lp-amber)" />
+              </g>
+
+              {/* who owns what */}
+              <g fontFamily="var(--lp-label)" fontSize="11.5" fontWeight="700"
+                 letterSpacing="1.1">
+                <text x="286" y="88" textAnchor="middle" fill="var(--lp-snt)">S&amp;T</text>
+                <text x="806" y="34" fill="var(--lp-trd)">TRD</text>
+                <text x="700" y="248" fill="var(--lp-engg)">ENGG</text>
+              </g>
+            </svg>
+            </div>
+            <figcaption>
+              One stretch of line, and everything on it belongs to somebody
+              different: the rails to <b>ENGG</b>, the overhead line to{" "}
+              <b>TRD</b>, the signal holding that train to <b>S&amp;T</b>.
+              Each asks for the track separately, so it is handed over three
+              times — and each time, that train waits.
+            </figcaption>
+          </figure>
         </section>
 
         {/* ── what it does ── */}
