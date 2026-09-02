@@ -1,5 +1,6 @@
 import type {
-  Approval, Block, Completion, Impact, Me, Network, Plan, StoreStatus,
+  Activity, Approval, Block, Completion, Impact, Me, Network, Plan, Report,
+  ReportStatus, StoreStatus, WindowQuote,
 } from "./types";
 
 /** Planning parameters. Kept in one place so every view asks for the same
@@ -146,3 +147,58 @@ export const uncompleteJob = (instanceId: string, taskId: string, token: string)
     })}`,
     { method: "DELETE", headers: auth(token) },
   );
+
+/* ── field intake ────────────────────────────────────────────────────── */
+
+/** The maintenance vocabulary, from the API. Fetched rather than hardcoded:
+ *  a form offering work the optimiser has never heard of files reports that
+ *  can never be planned. */
+export const getActivities = () =>
+  json<{ activities: Activity[]; departments: string[] }>(
+    `${API_ORIGIN}/api/activities`,
+  );
+
+export const getReports = (token: string) =>
+  json<{ reports: Report[] }>(`${API_ORIGIN}/api/reports`, {
+    headers: auth(token),
+  });
+
+export const fileReport = (body: ReportDraft, token: string) =>
+  json<Report>(`${API_ORIGIN}/api/reports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...auth(token) },
+    body: JSON.stringify(body),
+  });
+
+export const decideReport = (
+  id: string, status: ReportStatus, note: string, token: string,
+) =>
+  json<Report>(`${API_ORIGIN}/api/reports/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...auth(token) },
+    body: JSON.stringify({ status, note }),
+  });
+
+/** What a standalone closure for this job would cost on this section.
+ *  Arithmetic over the traffic profile — no solve, so it can run on every
+ *  keystroke of the duration field. */
+export const getWindows = (
+  sectionId: string, minutes: number, p: PlanParams,
+) =>
+  json<WindowQuote>(
+    `${API_ORIGIN}/api/window?${new URLSearchParams({
+      section_id: sectionId, minutes: String(minutes),
+      days: String(p.days), tasks: String(p.tasks),
+      grounded: String(p.grounded), seed: "42",
+      ...(p.horizonStart ? { horizon_start: p.horizonStart } : {}),
+    })}`,
+  );
+
+/** Everything a report needs at filing time. The rest — id, who filed it,
+ *  when, its status — the server fills in and the browser is not trusted to
+ *  supply. */
+export type ReportDraft = Pick<
+  Report,
+  "section_id" | "activity_type" | "summary" | "department" | "concerns"
+  | "severity" | "emergency" | "duration_minutes" | "crew_required" | "detail"
+>;

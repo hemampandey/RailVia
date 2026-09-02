@@ -16,4 +16,5 @@ export const PATH = {
   rail: "M4 6h16M4 12h16M4 18h10",
   map: "M9 4 3 7v13l6-3 6 3 6-3V4l-6 3-6-3zm0 0v13m6-10v13",
   cross: "M18 6 6 18M6 6l12 12",
+  flag: "M4 22V4m0 0h11l-1.5 4L15 12H4",
 };

@@ -28,14 +28,17 @@ from src.adapters import GroundedTimetableSource, SyntheticDataSource
 from src.ingest.railradar import load_dotenv
 from src.baseline.compare import run_comparison
 from src.ml.criticality import CriticalityModel
-from datetime import date
+from datetime import date, datetime
 
-from src.models import PlanningInstance, next_monday
+from src.models import CATALOGUE, PlanningInstance, next_monday
 from src.optimiser.model import BlockPlanner
-from src.optimiser.windows import TimeGrid
+from src.optimiser.windows import (
+    DEFAULT_PERCENTILE, TimeGrid, feasible_starts, permitted_slots,
+    traffic_by_slot,
+)
 from src.store import (
-    Approval, AuthError, Caller, Completion, bearer, store_for,
-    store_status, verify,
+    Approval, AuthError, Caller, Completion, Report, ReportStatus, bearer,
+    store_for, store_status, verify,
 )
 
 log = logging.getLogger(__name__)
@@ -701,6 +704,186 @@ def explain_task(
             {"feature": name, "contribution": round(float(value), 4)}
             for name, value in model.explain(instance, task_id)
         ],
+    }
+
+
+# ── field intake ────────────────────────────────────────────────────────
+#
+# Everything above answers "when should we close the line?". This part
+# answers the question that comes first: "there is something wrong with the
+# track — who needs to know?".
+#
+# Today that question is answered three times over, once per department, in
+# three systems that cannot see each other. A single intake is not a
+# convenience feature; it is the precondition for co-locating anything. See
+# PROJECT_BRIEF.md section 2.
+
+
+class ReportIn(BaseModel):
+    """One defect or work request, as filed from the field."""
+
+    section_id: str
+    activity_type: str
+    summary: str
+    department: str
+    concerns: list[str] = []
+    severity: int = 3
+    emergency: bool = False
+    duration_minutes: int = 120
+    crew_required: int = 2
+    detail: str = ""
+
+
+class DecisionIn(BaseModel):
+    status: ReportStatus
+    note: str = ""
+
+
+@app.get("/api/activities")
+def activities() -> dict:
+    """The maintenance vocabulary, grouped by department.
+
+    Served rather than hardcoded in the browser so the intake form offers
+    exactly the activities the planner knows how to schedule. A form with its
+    own list would drift, and a report naming work the optimiser has never
+    heard of cannot be planned.
+    """
+    return {
+        "activities": [
+            {
+                "activity_type": spec.activity_type,
+                "label": spec.label,
+                "department": spec.department.value,
+                "interval_days": spec.interval_days,
+                "typical_minutes": spec.duration_minutes_range[1],
+                "typical_crew": spec.crew_range[1],
+                "co_locatable": spec.co_locatable,
+                # Surfaced, not hidden: every periodicity here is still
+                # provisional, and the form should not imply otherwise.
+                "source": spec.source,
+            }
+            for spec in CATALOGUE
+        ],
+        "departments": ["ENGG", "TRD", "S&T"],
+    }
+
+
+@app.get("/api/reports")
+def list_reports(authorization: str | None = Header(default=None)) -> dict:
+    store = _store_as(_caller(authorization))
+    return {"reports": [r.model_dump(mode="json") for r in store.reports()]}
+
+
+@app.post("/api/reports")
+def file_report(
+    body: ReportIn, authorization: str | None = Header(default=None)
+) -> dict:
+    caller = _caller(authorization)
+    store = _store_as(caller)
+    record = Report(**{**body.model_dump(), "reported_by": caller.label})
+    try:
+        return store.file_report(record).model_dump(mode="json")
+    except Exception as exc:  # noqa: BLE001
+        raise _forbidden(exc) from exc
+
+
+@app.patch("/api/reports/{report_id}")
+def decide_report(
+    report_id: str, body: DecisionIn,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Accept or turn down a report. The head's decision, enforced by RLS."""
+    caller = _caller(authorization)
+    store = _store_as(caller)
+    try:
+        decided = store.decide_report(
+            report_id, body.status, caller.label, body.note
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _forbidden(exc) from exc
+    return decided.model_dump(mode="json")
+
+
+@app.get("/api/window")
+def quiet_windows(
+    section_id: str, minutes: int = 120, grounded: bool = True,
+    tasks: int = 120, days: int = 7, seed: int = 42,
+    horizon_start: str | None = None, limit: int = 6,
+    not_before: str | None = None,
+) -> dict:
+    """Where a job of this length could go on this section, cheapest first.
+
+    Pure arithmetic over the section's own traffic profile — no solve, no
+    cache, milliseconds. It answers the question an engineer filing a report
+    actually has: "if this needs its own closure, what does that cost?".
+
+    The answer is deliberately about ONE job in isolation, which is the
+    expensive case. The browser compares it against the closures already
+    planned on the same section, and the gap between the two is the whole
+    argument for co-locating.
+
+    Windows that have already passed are never offered. The horizon is a
+    calendar month and people file reports in the middle of one, so without
+    this the honest-looking answer to "when is the soonest?" was a date last
+    week. `not_before` defaults to now and exists so tests can pin it.
+    """
+    if minutes <= 0:
+        raise HTTPException(status_code=400, detail="minutes must be positive")
+
+    start = _parse_start(horizon_start)
+    instance = _load(grounded, tasks, days, seed, start)
+    if not any(s.id == section_id for s in instance.sections):
+        raise HTTPException(status_code=404, detail=f"unknown section {section_id}")
+
+    grid = TimeGrid(horizon_start=start, horizon_days=days)
+    series = traffic_by_slot(instance, grid)[section_id]
+    permitted = permitted_slots(series, DEFAULT_PERCENTILE)
+    length = grid.minutes_to_slots(minutes)
+    starts = feasible_starts(permitted, length)
+
+    floor = (
+        datetime.fromisoformat(not_before) if not_before else datetime.now()
+    )
+    remaining = [s for s in starts if grid.to_datetime(s) >= floor]
+    # The horizon being over is a different fact from the job not fitting,
+    # and the two need different words in front of an engineer.
+    horizon_over = bool(starts) and not remaining
+    starts = remaining
+
+    def cost(slot: int) -> float:
+        return round(sum(series[slot:slot + length]) * grid.slot_hours, 2)
+
+    priced = sorted(((cost(s), s) for s in starts), key=lambda pair: (pair[0], pair[1]))
+    cheapest = [
+        {
+            "start": grid.to_datetime(slot).isoformat(),
+            "end": grid.to_datetime(slot + length).isoformat(),
+            "train_hours": price,
+        }
+        for price, slot in priced[:limit]
+    ]
+    return {
+        "section_id": section_id,
+        "section_name": next(
+            s.name for s in instance.sections if s.id == section_id
+        ),
+        "minutes": minutes,
+        # Empty means the job is longer than any quiet stretch this section
+        # has. That is a real answer, not an error: it needs a traffic block,
+        # which is a different authority's decision.
+        "candidates": cheapest,
+        "earliest": (
+            {
+                "start": grid.to_datetime(min(starts)).isoformat(),
+                "end": grid.to_datetime(min(starts) + length).isoformat(),
+                "train_hours": cost(min(starts)),
+            }
+            if starts else None
+        ),
+        "permitted_share": round(sum(permitted) / len(permitted), 3),
+        "horizon_over": horizon_over,
     }
 
 

@@ -31,7 +31,7 @@ from datetime import date, timedelta
 
 from dataclasses import dataclass
 
-from src.generator.catalogue import CATALOGUE
+from src.models.catalogue import CATALOGUE
 from src.generator.synthetic import DEPARTMENT_WEIGHTS, _make_task
 from src.models import Section, Task
 

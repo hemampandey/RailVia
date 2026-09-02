@@ -9,10 +9,10 @@ key:
 Run `src/store/schema.sql` in the Supabase SQL editor once to create the
 tables.
 
-Failure policy: if Supabase is unreachable at startup this raises, and the
-factory in `__init__.py` falls back to SQLite rather than leaving the app
-without anywhere to record a decision. Losing an approval silently would be
-worse than recording it locally.
+Failure policy: if Supabase is unreachable this raises and the API answers
+503 saying so. There is no local fallback on purpose — see the note in
+`src/store/__init__.py`. Planning is unaffected either way, because the
+planner needs no store at all.
 """
 
 from __future__ import annotations
@@ -20,7 +20,9 @@ from __future__ import annotations
 import logging
 import os
 
-from src.store.base import Approval, Completion, Store
+from src.store.base import (
+    Approval, Completion, Report, ReportStatus, Store, now_iso,
+)
 
 log = logging.getLogger(__name__)
 
@@ -144,3 +146,42 @@ class SupabaseStore(Store):
                .eq("instance_id", instance_id)
                .order("completed_at", desc=True).execute())
         return [Completion(**row) for row in (res.data or [])]
+
+    # ── field reports ────────────────────────────────────────────────────
+    #
+    # Reports differ from approvals and completions in one way that matters:
+    # they are not keyed to an instance. A cracked fishplate is a fact about
+    # the track, not about whichever month's plan happened to be open when
+    # somebody noticed it, and it stays true across replans.
+
+    def file_report(self, report: Report) -> Report:
+        self.client.table("reports").upsert(
+            report.model_dump(mode="json"), on_conflict="id"
+        ).execute()
+        return report
+
+    def reports(self) -> list[Report]:
+        res = (self.client.table("reports").select("*")
+               .order("reported_at", desc=True).execute())
+        return [Report(**row) for row in (res.data or [])]
+
+    def decide_report(
+        self, report_id: str, status: ReportStatus, decided_by: str, note: str
+    ) -> Report:
+        res = (self.client.table("reports")
+               .update({
+                   "status": status.value,
+                   "decided_by": decided_by,
+                   "decided_at": now_iso(),
+                   "decision_note": note,
+               })
+               .eq("id", report_id).execute())
+        rows = res.data or []
+        if not rows:
+            # Either the id is wrong or RLS refused the update. Postgres
+            # returns an empty set for both, so say both.
+            raise LookupError(
+                f"no report {report_id} was updated — either it does not "
+                "exist, or only the divisional head may decide it"
+            )
+        return Report(**rows[0])

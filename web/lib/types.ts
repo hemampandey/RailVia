@@ -144,3 +144,89 @@ export interface Impact {
   start: string; end: string;
   affected_count: number; trains: AffectedTrain[];
 }
+
+/* ── field intake ──────────────────────────────────────────────────────
+ *
+ * A report is what an engineer files when they find something wrong. It is a
+ * request, not a scheduled job: it becomes work the planner can place only
+ * once the divisional head accepts it.
+ */
+
+export type ReportStatus = "open" | "accepted" | "rejected";
+
+export interface Report {
+  id: string;
+  section_id: string;
+  activity_type: string;
+  summary: string;
+  /** The department that owns the asset and will do the work. */
+  department: Dept;
+  /** Others who must attend — an OHE isolation, a signal disconnection.
+   *  This is the co-location signal: it is why one closure serves two. */
+  concerns: Dept[];
+  severity: number;
+  emergency: boolean;
+  duration_minutes: number;
+  crew_required: number;
+  detail: string;
+  status: ReportStatus;
+  reported_by: string;
+  reported_at: string;
+  decided_by: string;
+  decided_at: string;
+  decision_note: string;
+}
+
+/** One entry from the maintenance catalogue. Served by the API rather than
+ *  hardcoded here, so the form can only offer work the planner knows how to
+ *  schedule. */
+export interface Activity {
+  activity_type: string;
+  label: string;
+  department: Dept;
+  interval_days: number;
+  typical_minutes: number;
+  typical_crew: number;
+  co_locatable: boolean;
+  source: string;
+}
+
+export interface QuietWindow {
+  start: string;
+  end: string;
+  train_hours: number;
+}
+
+export interface WindowQuote {
+  section_id: string;
+  section_name: string;
+  minutes: number;
+  candidates: QuietWindow[];
+  earliest: QuietWindow | null;
+  permitted_share: number;
+  /** True when the month being planned has already run out — a different
+   *  fact from the job not fitting, and it needs different words. */
+  horizon_over: boolean;
+}
+
+export const SEVERITY_LABEL: Record<number, string> = {
+  1: "Cosmetic",
+  2: "Minor",
+  3: "Moderate",
+  4: "Serious",
+  5: "Safety-critical",
+};
+
+export const STATUS_LABEL: Record<ReportStatus, string> = {
+  open: "Awaiting the head",
+  accepted: "Accepted into the backlog",
+  rejected: "Turned down",
+};
+
+export const DEPTS: Dept[] = ["ENGG", "TRD", "S&T"];
+
+export const DEPT_FULL: Record<Dept, string> = {
+  ENGG: "Permanent way — track, ballast, rails, bridges",
+  TRD: "Traction distribution — overhead equipment",
+  "S&T": "Signal & telecommunications",
+};

@@ -8,8 +8,11 @@ import { ThemeToggle } from "./ThemeToggle";
 import { usePlanner } from "./PlannerProvider";
 import { useAuth } from "./AuthProvider";
 import { ROLE_LABEL, DIVISIONS } from "@/lib/types";
+import { getReports } from "@/lib/api";
 
+/* Intake first: a defect exists before a plan for it does. */
 const NAV = [
+  { href: "/report", label: "Raise a job", icon: PATH.flag },
   { href: "/calendar", label: "Calendar", icon: PATH.calendar },
   { href: "/plan", label: "Plan", icon: PATH.list },
   { href: "/map", label: "Map", icon: PATH.map },
@@ -22,6 +25,20 @@ export function Sidebar() {
   const { plan, approvals, completions, division, setDivision } = usePlanner();
   const { me, session, signOut, error: authError } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const [openReports, setOpenReports] = useState(0);
+
+  /* Reports waiting on the head. Fetched here rather than in the intake page
+     so the badge is visible from every view — an emergency defect nobody has
+     looked at is exactly the thing that must not need a click to discover. */
+  useEffect(() => {
+    const token = session?.access_token;
+    if (!token) { setOpenReports(0); return; }
+    let live = true;
+    getReports(token)
+      .then((r) => { if (live) setOpenReports(r.reports.filter((x) => x.status === "open").length); })
+      .catch(() => { /* the intake page reports the reason */ });
+    return () => { live = false; };
+  }, [session?.access_token]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -31,6 +48,11 @@ export function Sidebar() {
   /** Counts on the nav so the sidebar says what needs attention without
    *  making anyone open each view to find out. */
   const badge = (href: string): { text: string; warn?: boolean } | null => {
+    // Checked before the plan guard: a waiting report matters whether or
+    // not a plan has finished loading.
+    if (href === "/report") {
+      return openReports ? { text: String(openReports), warn: true } : null;
+    }
     if (!plan) return null;
     if (href === "/calendar") return { text: String(plan.block_count) };
     if (href === "/plan") {

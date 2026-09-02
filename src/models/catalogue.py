@@ -1,4 +1,11 @@
-"""Maintenance activity catalogue.
+"""Maintenance activity catalogue: the kinds of work that need a block.
+
+This sits beside the models, not in the generator, because it is shared
+vocabulary rather than a way of inventing data. The generator draws jobs from
+it; the intake form offers it to whoever is filing a defect. If it lived in
+the generator, the API could not name an activity without importing the
+generator — which the adapter boundary forbids, and the boundary test
+enforces. `calendar.py` moved here for the same reason.
 
 PROVENANCE WARNING (PROJECT_BRIEF.md section 3)
 -----------------------------------------------
@@ -17,7 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.models import Department
+from src.models.core import Department
 
 
 @dataclass(frozen=True)

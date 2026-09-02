@@ -12,13 +12,14 @@ from __future__ import annotations
 import logging
 
 from src.store.auth import AuthError, Caller, bearer, verify
-from src.store.base import Approval, Completion, Store
+from src.store.base import Approval, Completion, Report, ReportStatus, Store
 from src.store.supabase_store import SupabaseNotConfigured, SupabaseStore
 
 log = logging.getLogger(__name__)
 
 __all__ = [
-    "Approval", "AuthError", "Caller", "Completion", "Store",
+    "Approval", "AuthError", "Caller", "Completion", "Report", "ReportStatus",
+    "Store",
     "SupabaseNotConfigured", "SupabaseStore", "bearer", "get_store",
     "store_for", "store_status", "reset_store", "verify",
 ]

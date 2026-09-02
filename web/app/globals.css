@@ -1274,3 +1274,218 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-radius: var(--radius-sm);
 }
 .login code { font-family: var(--font-mono); font-size: 12px; }
+
+/* ── field intake ───────────────────────────────────────────────────────
+ *
+ * The form and, beside it, what filing it would mean. The two are laid out
+ * as a pair on purpose: the assessment is not a result shown afterwards, it
+ * is feedback while the person is still deciding what to write.
+ */
+
+.intake {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: var(--s5);
+  align-items: start;
+}
+
+@media (max-width: 1020px) {
+  .intake { grid-template-columns: minmax(0, 1fr); }
+}
+
+.intake-form { padding: 0 var(--s5) var(--s5); }
+.intake-form .panel-head { margin: 0 calc(-1 * var(--s5)) var(--s4); }
+
+.intake-side { position: sticky; top: var(--s5); display: grid; gap: var(--s4); }
+
+.field { display: flex; flex-direction: column; margin-bottom: var(--s4); }
+
+.field > label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  margin-bottom: var(--s2);
+}
+
+.field input[type="text"],
+.field input[type="number"],
+.field input:not([type]),
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.field textarea { resize: vertical; font-family: inherit; }
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary);
+}
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
+
+.hint {
+  margin: var(--s2) 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+/* Severity as a scale rather than a dropdown: the point is that 1 and 5 are
+   different in kind, and a list of five words hides that. */
+.sev-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s2); }
+
+.sev {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--s2) 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.sev b { font-size: 15px; font-weight: 800; }
+.sev span { font-size: 9.5px; text-align: center; color: var(--text-faint); line-height: 1.2; }
+.sev.on { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
+.sev.on span { color: var(--bad); }
+
+.emergency {
+  display: flex;
+  gap: var(--s3);
+  align-items: flex-start;
+  padding: var(--s3) var(--s4);
+  margin-bottom: var(--s4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.emergency.on { border-color: var(--bad); background: var(--bad-soft); }
+.emergency input { margin-top: 3px; accent-color: var(--bad); }
+.emergency span { display: block; font-size: 12px; line-height: 1.5; color: var(--text-faint); }
+.emergency b { display: block; font-size: 13px; color: var(--text); margin-bottom: 2px; }
+
+.form-foot { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; }
+.form-foot .hint { margin: 0; flex: 1 1 220px; }
+
+button.primary {
+  padding: 10px 20px;
+  font-weight: 700;
+  color: var(--on-primary);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+button.primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+/* ── the assessment ──────────────────────────────────────────────────── */
+
+.assess-body {
+  padding: var(--s4);
+  border-top: 1px solid var(--border-soft);
+  border-left: 3px solid transparent;
+}
+
+.assess-body:first-of-type { border-top: none; }
+.assess-body p { margin: var(--s2) 0 0; font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+.assess-body.good { border-left-color: var(--good); }
+.assess-body.warn { border-left-color: var(--accent); }
+.assess-body.urgent { border-left-color: var(--bad); }
+
+.assess-lead { font-size: 14px; font-weight: 700; color: var(--text); }
+.assess-body.good .assess-lead { color: var(--good); }
+.assess-body.urgent .assess-lead { color: var(--bad); }
+
+.cand { list-style: none; margin: var(--s3) 0 0; padding: 0; display: grid; gap: var(--s1); }
+
+.cand li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s3);
+  padding: 6px var(--s3);
+  font-size: 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.cand-meta { color: var(--text-faint); display: inline-flex; align-items: center; gap: 4px; }
+.cand-meta i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+.filed {
+  padding: var(--s3) var(--s4);
+  background: var(--good-soft);
+  border: 1px solid var(--good);
+  border-radius: var(--radius);
+}
+
+.filed b { display: block; font-size: 13px; color: var(--good); }
+.filed span { font-size: 12.5px; color: var(--text-muted); }
+
+/* ── the register ────────────────────────────────────────────────────── */
+
+.reg { display: grid; gap: var(--s3); }
+
+.rep {
+  display: flex;
+  gap: var(--s4);
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.rep.urgent { border-left-color: var(--bad); }
+.rep.accepted { border-left-color: var(--good); }
+.rep.rejected { opacity: 0.6; }
+.rep-main { min-width: 0; }
+.rep-top { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.rep-top b { font-size: 14px; }
+
+.tag-urgent {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bad);
+  background: var(--bad-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.rep-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); margin-top: var(--s2); }
+.rep-meta .hint { margin: 0; }
+.rep-detail { margin: var(--s2) 0 var(--s2); font-size: 13px; color: var(--text-muted); }
+.rep-side { display: grid; gap: var(--s2); justify-items: end; flex: none; text-align: right; }
+
+.rep-status {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.rep-status.open { background: var(--accent-soft); color: var(--accent); }
+.rep-status.accepted { background: var(--good-soft); color: var(--good); }

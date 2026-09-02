@@ -267,3 +267,14 @@ Three, each forced by measurement rather than preference:
   parallel time-limited search is not reproducible, and single-worker or
   deterministic-time alternatives were measured and are unusable. The data is
   fully deterministic; the search is not. (A-19)
+- **A filed report does not change the plan you are looking at.** Intake
+  records a defect and prices what closing for it would cost; it does not
+  re-solve. Plans are solved at build time and served from cache, so an
+  accepted report enters the backlog the next run draws from. Saying a report
+  had rescheduled the month when it had not would be the easiest lie in the
+  system to tell and the hardest to notice.
+- **The intake form offers the same activity catalogue the optimiser
+  schedules from.** That is why it cannot accept free-text work: a report
+  naming an activity the planner has never heard of could never be placed.
+  The periodicities in that catalogue are still provisional, and the form
+  carries their provenance string rather than presenting them as mandated.
