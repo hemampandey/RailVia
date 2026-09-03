@@ -33,10 +33,6 @@ export default function Landing() {
             </span>
             RailVia
           </div>
-          <nav>
-            <Link className="lp-btn ghost" href="/map">See the network</Link>
-            <Link className="lp-btn" href="/calendar">Open the planner</Link>
-          </nav>
         </header>
 
         {/* ── hero ── */}
@@ -56,7 +52,7 @@ export default function Landing() {
 
           <div className="lp-cta">
             <Link className="lp-btn" href="/calendar">Open the planner</Link>
-            <Link className="lp-btn ghost" href="/map">Look at a closure</Link>
+            <Link className="lp-btn ghost" href="/map">See the network</Link>
           </div>
 
           {/* ── the signature: the merge, on real data ── */}
@@ -164,27 +160,6 @@ export default function Landing() {
             to be closed. There is no shared queue, so the overlap is invisible
             to all of them.
           </p>
-          <div className="lp-depts">
-            <div className="lp-dept">
-              <span className="tag" style={{ background: "#fdf0dd", color: "#a8560a" }}>ENGG</span>
-              <h3>Permanent way</h3>
-              <p>Rails, sleepers, ballast, points and crossings.</p>
-              <div className="sys">defects in TMS</div>
-            </div>
-            <div className="lp-dept">
-              <span className="tag" style={{ background: "#f0e9fd", color: "#5f27bd" }}>TRD</span>
-              <h3>Traction distribution</h3>
-              <p>The overhead line the trains draw power from.</p>
-              <div className="sys">defects in TDMS</div>
-            </div>
-            <div className="lp-dept">
-              <span className="tag" style={{ background: "#e0f2ea", color: "#0d6b64" }}>S&amp;T</span>
-              <h3>Signal &amp; telecom</h3>
-              <p>Signals, point machines, track circuits, cabling.</p>
-              <div className="sys">defects in SMMS</div>
-            </div>
-          </div>
-
           {/* ── what a closure actually is ──
               Side elevation of one stretch of line: rails, the overhead
               line above, a signal, and a train held at it. All three
@@ -331,10 +306,8 @@ export default function Landing() {
             the published timetable, for every section it plans.
           </p>
           <p>
-            It then solves the whole month at once with a constraint solver,
-            respecting what a division actually has: crews per department per
-            day, mandated maintenance intervals, and the fact that two closures
-            cannot occupy one section at the same moment.
+            It then solves the whole month at once, against what a division
+            actually has: crews, mandated intervals, and one track.
           </p>
           <div className="lp-figures">
             <div className="lp-fig">
@@ -351,11 +324,9 @@ export default function Landing() {
             </div>
           </div>
           <div className="lp-caveat">
-            <b>Measured, with the range stated.</b> That figure was 28.5% to
-            41.6% over four runs at a 60-second solver budget, comparing the
-            same set of jobs against a simulation of today's process. A
-            time-limited search returns one of several good schedules, so the
-            honest number is a range and the budget belongs beside it.
+            <b>Measured, with the range stated.</b> 28.5% to 41.6% over four
+            runs at a 60-second budget, against a simulation of today's
+            process doing the same set of jobs.
           </div>
         </section>
 
@@ -386,11 +357,6 @@ export default function Landing() {
               </p>
             </div>
           </div>
-          <div className="lp-caveat" style={{ borderLeftColor: "var(--lp-rail)" }}>
-            <b>The cost side runs on real data.</b> Train-hours lost — the
-            number every decision is weighed against — is computed from a real
-            timetable. Only the work being scheduled is invented.
-          </div>
         </section>
 
         {/* ── close ── */}
@@ -403,7 +369,7 @@ export default function Landing() {
           </p>
           <div className="lp-cta">
             <Link className="lp-btn" href="/calendar">Open the planner</Link>
-            <Link className="lp-btn ghost" href="/map">See affected trains</Link>
+            <Link className="lp-btn ghost" href="/map">See the network</Link>
           </div>
         </section>
 
