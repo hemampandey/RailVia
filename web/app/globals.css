@@ -1,136 +1,165 @@
-/* ── RailVia Modern Glassmorphic Design System ─────────────────────── */
+/* ── RailVia ────────────────────────────────────────────────────────────
+ *
+ * The register is a railway operations document: a working timetable, a
+ * possession notice, a page of the permanent way manual. Dense, ruled,
+ * tabular, flat. Not a product dashboard.
+ *
+ * This is deliberately the SAME identity as the public landing page and the
+ * project's written briefs — Archivo over Source Sans 3 over IBM Plex Mono,
+ * rail blue, and the three department colours. One system, three surfaces.
+ *
+ * Two rules that keep it honest:
+ *   Colour carries meaning or it is not used. Ochre is ENGG, violet is TRD,
+ *   teal is S&T, red is danger, green is clear. Nothing is coloured to look
+ *   lively.
+ *   Every number is monospaced and tabular, because these are figures a
+ *   planner compares down a column.
+ */
 
 :root {
-  /* Light Theme Palette */
-  --bg: #f3f6fc;
+  /* Blue-biased neutrals — a paper white with the rail hue in it, not a
+     stock grey ramp. */
+  --bg: #eef2f6;
   --surface: #ffffff;
-  --surface-2: #eef3fb;
-  --surface-3: #e1e9f5;
-  --border: #cbd5e1;
-  --border-soft: #e2e8f0;
+  --surface-2: #e7edf3;
+  --surface-3: #dae3ec;
+  --border: #b9c8d6;
+  --border-soft: #d8e1ea;
 
-  --text: #0f172a;
-  --text-muted: #475569;
-  --text-faint: #64748b;
+  --text: #14202b;
+  --text-muted: #41566a;
+  --text-faint: #6a7f93;
 
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-soft: #eff6ff;
-  --primary-glow: rgba(37, 99, 235, 0.15);
+  /* Structural blue: the spine of the system, used for orientation and
+     never for decoration. */
+  --primary: #1d3a5c;
+  --primary-hover: #142942;
+  --primary-soft: #dde7f2;
+  --primary-glow: transparent;      /* glows are a dashboard habit */
   --on-primary: #ffffff;
 
-  --accent: #d97706;
-  --accent-soft: #fffbeb;
+  --accent: #8a5209;
+  --accent-soft: #f7ecd9;
 
-  --good: #059669;
-  --good-soft: #ecfdf5;
-  --good-glow: rgba(5, 150, 105, 0.15);
+  --good: #0c6b4d;
+  --good-soft: #dcefe7;
+  --good-glow: transparent;
 
-  --bad: #dc2626;
-  --bad-soft: #fef2f2;
+  --bad: #a82318;
+  --bad-soft: #f8e4e1;
 
-  --engg: #f59e0b;
-  --trd: #8b5cf6;
-  --snt: #10b981;
+  /* The three departments. These are identity, not palette — the same three
+     hues appear on the landing page and in every diagram. */
+  --engg: #a8560a;
+  --trd: #5f27bd;
+  --snt: #0d6b64;
 
-  --engg-soft: rgba(245, 158, 11, 0.12);
-  --trd-soft: rgba(139, 92, 246, 0.12);
-  --snt-soft: rgba(16, 185, 129, 0.12);
+  --engg-soft: rgba(168, 86, 10, 0.11);
+  --trd-soft: rgba(95, 39, 189, 0.11);
+  --snt-soft: rgba(13, 107, 100, 0.11);
 
-  --shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 12px 32px -4px rgba(15, 23, 42, 0.12);
+  /* Documents are ruled, not floated. Depth comes from hairlines. */
+  --shadow: none;
+  --shadow-sm: none;
+  --shadow-lg: 0 8px 28px rgba(20, 32, 43, 0.16);
 
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 3px;
+  --radius-sm: 2px;
   --radius-full: 9999px;
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
   --sidebar: 240px;
 
-  --font-sans: "Plus Jakarta Sans", "Fira Sans", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
-  --backdrop-blur: blur(12px);
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Archivo Narrow", "Archivo", ui-sans-serif, sans-serif;
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --backdrop-blur: none;
 }
 
+/* Dark is a lit control-room panel, not an inverted document: the ground
+   goes deep blue-black and the department hues lift to stay legible on it. */
 :root[data-theme="dark"] {
-  --bg: #090d16;
-  --surface: #111827;
-  --surface-2: #162032;
-  --surface-3: #1f2d45;
-  --border: #24344d;
-  --border-soft: #1a273b;
+  --bg: #0b131c;
+  --surface: #121d29;
+  --surface-2: #1a2735;
+  --surface-3: #243343;
+  --border: #2c3e52;
+  --border-soft: #223143;
 
-  --text: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-faint: #64748b;
+  --text: #e9eff6;
+  --text-muted: #a7bacd;
+  --text-faint: #7b91a7;
 
-  --primary: #264d8e;
-  --primary-hover: #7dd3fc;
-  --primary-soft: rgba(56, 189, 248, 0.12);
-  --primary-glow: rgba(56, 189, 248, 0.25);
-  --on-primary: #090d16;
+  --primary: #7fb0e8;
+  --primary-hover: #a8cbf3;
+  --primary-soft: #16283d;
+  --primary-glow: transparent;
+  --on-primary: #0b131c;
 
-  --accent: #fbbf24;
-  --accent-soft: rgba(251, 191, 36, 0.12);
+  --accent: #d9963c;
+  --accent-soft: rgba(217, 150, 60, 0.14);
 
-  --good: #34d399;
-  --good-soft: rgba(52, 211, 153, 0.12);
-  --good-glow: rgba(52, 211, 153, 0.25);
+  --good: #4cc79a;
+  --good-soft: rgba(76, 199, 154, 0.14);
+  --good-glow: transparent;
 
-  --bad: #f87171;
-  --bad-soft: rgba(248, 113, 113, 0.12);
+  --bad: #ef7a6d;
+  --bad-soft: rgba(239, 122, 109, 0.14);
 
-  --engg: #fbbf24;
-  --trd: #a78bfa;
-  --snt: #34d399;
+  --engg: #e59a3f;
+  --trd: #a98cf5;
+  --snt: #43bfae;
 
-  --engg-soft: rgba(251, 191, 36, 0.16);
-  --trd-soft: rgba(167, 139, 250, 0.16);
-  --snt-soft: rgba(52, 211, 153, 0.16);
+  --engg-soft: rgba(229, 154, 63, 0.15);
+  --trd-soft: rgba(169, 140, 245, 0.15);
+  --snt-soft: rgba(67, 191, 174, 0.15);
 
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow: none;
+  --shadow-sm: none;
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.55);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #000000;
-    --surface: #000000;
-    --surface-2: #000000;
-    --surface-3: #000000;
-    --border: #24344d;
-    --border-soft: #1a273b;
+    --bg: #0b131c;
+    --surface: #121d29;
+    --surface-2: #1a2735;
+    --surface-3: #243343;
+    --border: #2c3e52;
+    --border-soft: #223143;
 
-    --text: #f1f5f9;
-    --text-muted: #b5b7ba;
-    --text-faint: #64748b;
+    --text: #e9eff6;
+    --text-muted: #a7bacd;
+    --text-faint: #7b91a7;
 
-    --primary: #264d8e;
-    --primary-hover: #7dd3fc;
-    --primary-soft: rgba(56, 189, 248, 0.12);
-    --primary-glow: rgba(56, 189, 248, 0.25);
-    --on-primary: #090d16;
+    --primary: #7fb0e8;
+    --primary-hover: #a8cbf3;
+    --primary-soft: #16283d;
+    --primary-glow: transparent;
+    --on-primary: #0b131c;
 
-    --accent: #fbbf24;
-    --accent-soft: rgba(251, 191, 36, 0.12);
+    --accent: #d9963c;
+    --accent-soft: rgba(217, 150, 60, 0.14);
 
-    --good: #34d399;
-    --good-soft: rgba(52, 211, 153, 0.12);
-    --good-glow: rgba(52, 211, 153, 0.25);
+    --good: #4cc79a;
+    --good-soft: rgba(76, 199, 154, 0.14);
+    --good-glow: transparent;
 
-    --bad: #f87171;
-    --bad-soft: rgba(248, 113, 113, 0.12);
+    --bad: #ef7a6d;
+    --bad-soft: rgba(239, 122, 109, 0.14);
 
-    --engg: #fbbf24;
-    --trd: #a78bfa;
-    --snt: #34d399;
+    --engg: #e59a3f;
+    --trd: #a98cf5;
+    --snt: #43bfae;
 
-    --engg-soft: rgba(251, 191, 36, 0.16);
-    --trd-soft: rgba(167, 139, 250, 0.16);
-    --snt-soft: rgba(52, 211, 153, 0.16);
+    --engg-soft: rgba(229, 154, 63, 0.15);
+    --trd-soft: rgba(169, 140, 245, 0.15);
+    --snt-soft: rgba(67, 191, 174, 0.15);
 
-    --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+    --shadow: none;
+    --shadow-sm: none;
+    --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -201,21 +230,19 @@ a { color: inherit; text-decoration: none; }
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   display: grid;
   place-items: center;
   flex: none;
-  box-shadow: 0 2px 10px var(--primary-glow);
 }
 
 .brand b {
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-size: 17px;
   font-weight: 800;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--text) 30%, var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.025em;
+  color: var(--text);
 }
 
 .brand span.tag {
@@ -282,7 +309,6 @@ a { color: inherit; text-decoration: none; }
   height: 6px;
   border-radius: 50%;
   background: var(--good);
-  box-shadow: 0 0 8px var(--good);
   display: inline-block;
 }
 
@@ -436,7 +462,6 @@ a { color: inherit; text-decoration: none; }
   width: 3.5px;
   border-radius: 0 4px 4px 0;
   background: var(--primary);
-  box-shadow: 0 0 8px var(--primary);
 }
 
 .side nav a .count {
@@ -527,9 +552,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .page-header h1 {
   margin: 0;
-  font-size: 22px;
+  font-family: var(--font-display);
+  font-size: 23px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.028em;
   display: flex;
   align-items: center;
   gap: var(--s2);
@@ -539,7 +565,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   height: 8px;
   border-radius: 50%;
   background: var(--good);
-  box-shadow: 0 0 10px var(--good);
   display: inline-block;
 }
 
@@ -553,14 +578,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: relative;
   overflow: hidden;
 }
-.brief::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--primary), var(--trd), var(--good));
-}
-
 .brief-top {
   display: flex;
   align-items: center;
@@ -572,46 +589,46 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .brief h2 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.018em;
 }
 
 /* ── KPI Stat Cards ─────────────────────────────────────────────────── */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0;
   margin-top: var(--s4);
+  border-top: 1px solid var(--border);
 }
 
 .kpi-card {
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  padding: var(--s3) var(--s4);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-soft);
+  border-radius: 0;
+  padding: var(--s3) var(--s4) var(--s3) 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  transition: all 0.2s ease;
+  gap: 2px;
   position: relative;
 }
-.kpi-card:hover {
-  border-color: var(--border);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow);
-}
+.kpi-card:last-child { border-right: none; }
+.kpi-card + .kpi-card { padding-left: var(--s4); }
 .kpi-card .kpi-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 .kpi-card .kpi-label {
-  font-size: 11.5px;
+  font-family: var(--font-label);
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-faint);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.09em;
 }
 .kpi-card .kpi-icon {
   width: 24px;
@@ -624,9 +641,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-size: 12px;
 }
 .kpi-card .kpi-val {
-  font-size: 24px;
-  font-weight: 800;
+  font-family: var(--font-mono);
+  word-spacing: -0.25em;
+  font-size: 25px;
+  font-weight: 600;
   letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
   color: var(--text);
   margin-top: 2px;
 }
@@ -634,7 +654,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .kpi-card.warn .kpi-val { color: var(--bad); }
 
 .kpi-card .kpi-progress {
-  height: 4px;
+  height: 3px;
   background: var(--surface-3);
   border-radius: var(--radius-full);
   margin-top: var(--s2);
@@ -671,7 +691,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 5px 12px;
   font-size: 12.5px;
   font-weight: 600;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -737,9 +757,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .panel h3 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
 }
 
 .cal {
@@ -749,9 +770,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 .dow {
-  font-size: 11px;
+  font-family: var(--font-label);
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-faint);
   text-align: center;
@@ -840,7 +862,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: var(--backdrop-blur);
   z-index: 90;
   animation: fadeIn 0.2s ease;
 }
