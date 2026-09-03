@@ -63,10 +63,18 @@ const qs = (p: PlanParams) => {
 const auth = (token?: string): HeadersInit =>
   token ? { Authorization: `Bearer ${token}` } : {};
 
+/** Every call gets a deadline. A request that hangs never rejects, so a
+ *  `.catch` never runs and the awaiting code waits forever — which is
+ *  exactly how a slow store took the whole app down once. */
+const DEADLINE_MS = 90_000;
+
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url, init);
+    res = await fetch(url, {
+      ...init,
+      signal: init?.signal ?? AbortSignal.timeout(DEADLINE_MS),
+    });
   } catch {
     // A browser reports every network-level failure as the same opaque
     // "Failed to fetch". Nine times out of ten here it means the Python
@@ -92,7 +100,13 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
 export const getPlan = (p: PlanParams) =>
   json<Plan>(`${API_ORIGIN}/api/plan?${qs(p)}`);
 
-export const getStore = () => json<StoreStatus>(`${API_ORIGIN}/api/store`);
+export const getStore = () =>
+  json<StoreStatus>(`${API_ORIGIN}/api/store`, {
+    // Shorter than the rest: nothing on screen depends on this answer, and a
+    // store that takes longer than this is unusable for recording decisions
+    // anyway. Failing fast shows the banner instead of a spinner.
+    signal: AbortSignal.timeout(12_000),
+  });
 
 /** Station positions and section geometry. Fetched once — it does not change
  *  with the plan. */

@@ -55,6 +55,19 @@ class SupabaseNotConfigured(RuntimeError):
     pass
 
 
+# Every call to Supabase gets a deadline.
+#
+# Without one the client waits forever: measured here, create_client returned
+# in 0.22s and the first query never came back at all, while curl to the same
+# project answered in half a second. A request that cannot fail cannot be
+# caught either, so the API hung, and with it the whole UI — which had no
+# business waiting on the store to draw a plan.
+#
+# Ten seconds is far longer than a healthy round trip (~0.5s) and far shorter
+# than a person will wait before deciding the page is broken.
+REQUEST_TIMEOUT_SECONDS = 10
+
+
 class SupabaseStore(Store):
     backend = "Supabase"
     shared = True
@@ -82,11 +95,15 @@ class SupabaseStore(Store):
                 f"{' and '.join(missing)} in {where}, then restart."
             )
         try:
-            from supabase import create_client
+            from supabase import ClientOptions, create_client
         except ImportError as exc:  # pragma: no cover
             raise SupabaseNotConfigured("supabase package not installed") from exc
 
-        self.client = create_client(url, key)
+        self.client = create_client(url, key, options=ClientOptions(
+            postgrest_client_timeout=REQUEST_TIMEOUT_SECONDS,
+            storage_client_timeout=REQUEST_TIMEOUT_SECONDS,
+            function_client_timeout=REQUEST_TIMEOUT_SECONDS,
+        ))
         if access_token:
             # Act AS the signed-in user, so Postgres row-level security
             # decides what they may do. Without this every request would run

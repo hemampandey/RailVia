@@ -72,18 +72,34 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     setLoading(true);
     setError(null);
+
+    /* The plan first, and on its own.
+     *
+     * This used to await the store before the plan. The store only says
+     * whether decisions can be recorded — the plan needs it for nothing —
+     * but a Supabase that hangs rather than fails takes the catch with it,
+     * and the whole app sat on "Loading…" forever. Measured: the plan came
+     * back in 3ms while the store took over twenty seconds.
+     *
+     * So the page draws as soon as it has a plan, and everything to do with
+     * the store arrives afterwards or not at all. */
     (async () => {
       try {
+        const p = await getPlan(params);
+        if (cancelled) return;
+        setPlan(p);
+        setLoading(false);
+
         const status = await getStore().catch(
           (): StoreStatus => ({
             connected: false, backend: "Supabase", shared: true,
-            detail: "API unreachable",
+            detail: "Could not reach the store — planning is unaffected, "
+              + "but approvals and completions cannot be recorded.",
           }),
         );
-        const p = await getPlan(params);
         if (cancelled) return;
         setStore(status);
-        setPlan(p);
+
         if (status.connected && token) {
           try {
             const d = await getDecisions(p.instance_id, token);
@@ -100,9 +116,10 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
           setCompletions(new Map());
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : String(e));
+          setLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
