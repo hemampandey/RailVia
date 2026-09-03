@@ -1,6 +1,6 @@
 import type {
   Activity, Approval, Block, Completion, Impact, Me, Network, Plan, Report,
-  ReportStatus, StoreStatus, TrafficCase, WindowQuote,
+  Replan, ReportStatus, StoreStatus, TrafficCase, WindowQuote,
 } from "./types";
 
 /** Planning parameters. Kept in one place so every view asks for the same
@@ -215,4 +215,26 @@ export const getTraffic = (
       grounded: String(p.grounded), seed: "42",
       ...(p.horizonStart ? { horizon_start: p.horizonStart } : {}),
     })}`,
+  );
+
+/** Re-plan the remainder after an overrun. This one does solve, so it is
+ *  slow (up to the time limit) — and on a host with runtime solving off it
+ *  returns the constructive schedule, with a status that says so. */
+export const replanAfter = (
+  sectionId: string, at: string, overrunMinutes: number, p: PlanParams,
+) =>
+  json<Replan>(
+    `${API_ORIGIN}/api/replan?${new URLSearchParams({
+      days: String(p.days), tasks: String(p.tasks),
+      grounded: String(p.grounded), seed: "42",
+      time_limit: String(p.timeLimit),
+      ...(p.horizonStart ? { horizon_start: p.horizonStart } : {}),
+    })}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        section_id: sectionId, at, overrun_minutes: overrunMinutes,
+      }),
+    },
   );

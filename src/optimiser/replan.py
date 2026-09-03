@@ -83,8 +83,16 @@ def replan_after(
     time_limit: float = 30.0,
     percentile: float = 25.0,
     criticality: dict[str, float] | None = None,
+    greedy_only: bool = False,
 ) -> ReplanResult:
-    """Re-solve the remainder of the horizon after a disruption."""
+    """Re-solve the remainder of the horizon after a disruption.
+
+    `greedy_only` skips building the CP-SAT model and returns the constructive
+    schedule instead. It exists for hosts too small to hold the model — the
+    deployed image runs with runtime solving off — and the returned status
+    says which route was taken, so a greedy re-plan is never mistaken for an
+    optimised one.
+    """
     completed: list[str] = []
     carried: list[str] = []
 
@@ -124,9 +132,11 @@ def replan_after(
         {k: v for k, v in criticality.items() if k in set(carried)}
         if criticality else None
     )
-    replanned = BlockPlanner(
-        remaining, time_limit=time_limit, percentile=percentile, criticality=weights
-    ).solve()
+    planner = BlockPlanner(
+        remaining, time_limit=time_limit, percentile=percentile,
+        criticality=weights, build_model=not greedy_only,
+    )
+    replanned = planner.greedy_only() if greedy_only else planner.solve()
 
     return ReplanResult(
         original=original,

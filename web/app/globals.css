@@ -1664,3 +1664,65 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .xp-def-h { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; font-size: 13px; }
+
+/* ── if it overruns ─────────────────────────────────────────────────────
+ *
+ * The re-plan is allowed to come out worse, and usually does. Nothing here
+ * styles the "better" case more prominently than the "worse" one — a
+ * re-planner that only looks good when it wins is not measuring anything.
+ */
+
+.rp-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin: var(--s3) 0;
+}
+
+.rp-cost {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  margin: var(--s3) 0;
+  padding: var(--s3);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+.rp-cost > div { display: flex; flex-direction: column; }
+.rp-cost span { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); font-weight: 700; }
+.rp-cost b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.rp-cost b.bad { color: var(--bad); }
+.rp-cost b.good { color: var(--good); }
+.rp-cost small { font-size: 10.5px; color: var(--text-faint); }
+
+.rp-delta {
+  margin-left: auto;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+}
+.rp-delta.worse { color: var(--bad); background: var(--bad-soft); }
+.rp-delta.better { color: var(--good); background: var(--good-soft); }
+
+.rp-verdict {
+  padding: var(--s3);
+  border-radius: 0 4px 4px 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.rp-verdict.worse { background: var(--bad-soft); border-left: 2px solid var(--bad); }
+.rp-verdict.better { background: var(--good-soft); border-left: 2px solid var(--good); }
+
+.rp-why { margin-top: var(--s3); font-size: 12.5px; }
+.rp-why > summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 600;
+  padding: var(--s2) 0;
+}
+.rp-why p { margin: var(--s2) 0 0; color: var(--text-muted); line-height: 1.55; }
+.rp-why p b { color: var(--text); }

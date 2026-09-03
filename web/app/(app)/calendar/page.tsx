@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { usePlanner } from "@/components/PlannerProvider";
-import { BlockRow } from "@/components/BlockRow";
 import { Fact, Loading } from "@/components/Common";
 import { PeriodPicker } from "@/components/PeriodPicker";
 import { GanttView } from "@/components/GanttView";
@@ -279,22 +278,6 @@ export default function CalendarPage() {
         />
       )}
 
-      {/* In-page list fallback if drawer is closed */}
-      {!selected && viewMode === "grid" && (
-        <div style={{ marginTop: "var(--s4)" }}>
-          <div className="panel-head">
-            <h3>Coordinated Block Schedule Overview</h3>
-          </div>
-          {filteredBlocks.slice(0, 5).map((b) => (
-            <BlockRow key={b.section_id + b.start} block={b} showDate />
-          ))}
-          {filteredBlocks.length > 5 && (
-            <div className="empty-state" style={{ padding: "var(--s3)" }}>
-              Showing top 5 closures. Select a specific day or switch to Gantt Timeline to view all.
-            </div>
-          )}
-        </div>
-      )}
     </>
   );
 }

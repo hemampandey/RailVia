@@ -248,3 +248,43 @@ export interface TrafficCase {
     at_peak_train_hours: number;
   } | Record<string, never>;
 }
+
+/** What happens to the rest of the month after something overruns.
+ *
+ * `delta` is positive when the disruption cost train-hours, and it often is:
+ * the horizon has shrunk and the overrun ate a quiet window other work
+ * needed. A re-planner that always claimed an improvement would not be
+ * measuring anything, so the UI shows this signed and unhidden.
+ */
+export interface Replan {
+  section_id: string;
+  section_name: string;
+  at: string;
+  overrun_minutes: number;
+  description: string;
+  status: string;
+  wall_time: number;
+  completed: number;
+  carried: number;
+  /** What the original month-long plan had booked for this stretch.
+   *  Context only — comparing against it credits the disruption with the
+   *  benefit of a second, smaller solve. */
+  train_hours_before: number;
+  /** The same leftover work re-solved with nothing gone wrong. This is the
+   *  like-for-like baseline. */
+  train_hours_control: number;
+  train_hours_after: number;
+  /** The disruption's own cost: after minus control. The only figure worth
+   *  quoting, and it is signed. */
+  delta: number;
+  /** What a naive reading would have reported. Kept so the difference can be
+   *  shown rather than quietly corrected. */
+  delta_vs_original: number;
+  blocks_before: number;
+  blocks_after: number;
+  blocks_control: number;
+  scheduled_after: number;
+  unplaceable: number;
+  unplaceable_control: number;
+  blocks: Block[];
+}
