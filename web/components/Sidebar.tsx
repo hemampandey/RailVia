@@ -12,6 +12,7 @@ import { ROLE_LABEL, DIVISIONS } from "@/lib/types";
 /* Intake first: a defect exists before a plan for it does. */
 const NAV = [
   { href: "/report", label: "Raise a job", icon: PATH.flag },
+  { href: "/tonight", label: "Tonight", icon: PATH.clock },
   { href: "/calendar", label: "Calendar", icon: PATH.calendar },
   { href: "/plan", label: "Plan", icon: PATH.list },
   { href: "/map", label: "Map", icon: PATH.map },
@@ -46,6 +47,14 @@ export function Sidebar() {
       return waiting.length ? { text: String(waiting.length), warn: true } : null;
     }
     if (!plan) return null;
+    if (href === "/tonight") {
+      const t = Date.now(), end = t + 24 * 3600_000;
+      const due = plan.blocks.filter((b) =>
+        new Date(b.end).getTime() >= t && new Date(b.start).getTime() <= end);
+      const ungranted = due.filter((b) => !approvals.has(`${b.section_id}@${b.start}`));
+      if (!due.length) return null;
+      return { text: String(due.length), warn: ungranted.length > 0 };
+    }
     if (href === "/calendar") return { text: String(plan.block_count) };
     if (href === "/plan") {
       return plan.exceptions.length

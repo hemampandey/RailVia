@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { BlockNotice } from "./BlockNotice";
 import { ExplainDrawer } from "./ExplainDrawer";
 import { usePlanner } from "./PlannerProvider";
 import { useAuth } from "./AuthProvider";
 import { Icon, PATH } from "./icons";
 import type { Block, Job } from "@/lib/types";
-import { DEPT_VAR } from "@/lib/types";
+import { blockKey, DEPT_VAR } from "@/lib/types";
 
 function JobChip({ job, done }: { job: Job; done: boolean }) {
   return (
@@ -30,6 +31,7 @@ export function BlockRow({ block, showDate = false }: {
   const [busy, setBusy] = useState<"approve" | "done" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [explaining, setExplaining] = useState(false);
+  const [issuing, setIssuing] = useState(false);
 
   const approved = isApproved(block);
   const done = isDone(block);
@@ -126,6 +128,11 @@ export function BlockRow({ block, showDate = false }: {
               : approved ? "Approved"
                 : isPast ? "Passed" : "Approve"}
           </button>
+          <button type="button" className="notice-btn"
+            onClick={() => setIssuing(true)}
+            title="The permission notice for this closure">
+            Notice
+          </button>
           <button type="button" className={done ? "on" : ""}
             disabled={!canComplete || busy !== null}
             aria-pressed={done}
@@ -138,6 +145,10 @@ export function BlockRow({ block, showDate = false }: {
       </div>
       {explaining && (
         <ExplainDrawer block={block} onClose={() => setExplaining(false)} />
+      )}
+      {issuing && (
+        <BlockNotice block={block} approval={approvals.get(blockKey(block))}
+          onClose={() => setIssuing(false)} />
       )}
     </div>
   );

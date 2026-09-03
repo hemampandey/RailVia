@@ -191,7 +191,7 @@ export default function ReportPage() {
         <div className="intake">
           <form className="panel intake-form" onSubmit={submit}>
             <div className="panel-head">
-              <h3>What have you found?</h3>
+              <h3 >What have you found?</h3>
             </div>
 
             <div className="field">

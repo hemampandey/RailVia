@@ -17,4 +17,5 @@ export const PATH = {
   map: "M9 4 3 7v13l6-3 6 3 6-3V4l-6 3-6-3zm0 0v13m6-10v13",
   cross: "M18 6 6 18M6 6l12 12",
   flag: "M4 22V4m0 0h11l-1.5 4L15 12H4",
+  clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2",
 };

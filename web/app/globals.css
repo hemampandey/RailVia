@@ -1766,3 +1766,313 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
 }
 .passed > summary:hover { color: var(--text-muted); }
 .passed[open] > summary { color: var(--text-muted); }
+
+/* ── block permission notice ────────────────────────────────────────────
+ *
+ * A document, not a panel: it is meant to be printed and carried to site, so
+ * it is set on a sheet with real margins and it prints alone.
+ */
+
+.notice-btn { font-weight: 700; color: var(--accent); border-color: var(--accent); }
+.notice-btn:hover:not(:disabled) { background: var(--accent-soft); }
+
+.notice-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(10, 18, 27, 0.62);
+  display: grid;
+  place-items: start center;
+  padding: var(--s5) var(--s4);
+  overflow-y: auto;
+}
+
+.notice-sheet { width: min(760px, 100%); }
+
+.notice-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+}
+.notice-actions button { background: var(--surface); }
+
+/* The sheet stays paper-white in both themes. A possession notice is a
+   printed object; a dark one would be a screen artefact. */
+.notice {
+  background: #ffffff;
+  color: #14202b;
+  padding: 40px 44px 32px;
+  border-radius: var(--radius);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+.n-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s4);
+  padding-bottom: var(--s4);
+  border-bottom: 2px solid #14202b;
+}
+.n-mark {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1d3a5c;
+}
+.n-head h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 2px 0 0;
+}
+.n-ref { text-align: right; flex: none; }
+.n-ref span {
+  display: block;
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6a7f93;
+}
+.n-ref b {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.n-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s4) var(--s5);
+  margin: var(--s5) 0;
+}
+.n-grid.tight { margin: var(--s3) 0 0; }
+.n-grid dt {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6a7f93;
+  margin-bottom: 3px;
+}
+.n-grid dd { margin: 0; font-size: 15px; font-weight: 600; }
+.n-grid dd code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #6a7f93;
+  background: none;
+  margin-left: 7px;
+}
+.n-grid dd.big {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.n-block { margin-top: var(--s5); }
+.n-block h3 {
+  font-family: var(--font-label);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #1d3a5c;
+  margin: 0 0 var(--s2);
+  padding-bottom: 5px;
+  border-bottom: 1px solid #b9c8d6;
+}
+
+.n-depts { display: flex; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3); }
+.n-depts span {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 700; font-size: 14px;
+}
+.n-depts i { width: 9px; height: 9px; border-radius: 50%; }
+
+.n-table { width: 100%; border-collapse: collapse; margin-top: var(--s2); }
+.n-table th {
+  font-family: var(--font-label);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #6a7f93;
+  text-align: left;
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid #d8e1ea;
+}
+.n-table td {
+  padding: 7px 8px 7px 0;
+  font-size: 13.5px;
+  border-bottom: 1px solid #eef2f6;
+  vertical-align: top;
+}
+.n-table .r { text-align: right; padding-right: 0; font-variant-numeric: tabular-nums; }
+.n-table .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  display: inline-block; margin-right: 6px;
+}
+.n-table b.od { color: #a82318; font-size: 11px; text-transform: uppercase; }
+
+.n-note { font-size: 13px; color: #41566a; margin: var(--s2) 0 0; }
+.n-note b { color: #14202b; }
+.n-pending {
+  font-size: 13.5px;
+  color: #8a5209;
+  background: #f7ecd9;
+  padding: 10px 14px;
+  margin: var(--s2) 0 0;
+  border-left: 2px solid #8a5209;
+}
+
+.n-foot {
+  margin-top: var(--s6);
+  padding-top: var(--s3);
+  border-top: 1px solid #b9c8d6;
+}
+.n-foot p { font-size: 11.5px; line-height: 1.5; color: #6a7f93; margin: 0 0 6px; }
+.n-foot p:last-child { margin-bottom: 0; }
+.n-foot b { color: #a82318; }
+
+/* Printing: the sheet alone, on paper, with nothing of the application
+   around it. `visibility` rather than `display` so the notice keeps its place
+   in the flow and does not have to be repositioned. */
+@media print {
+  body { background: #fff; }
+  body * { visibility: hidden; }
+  .notice, .notice * { visibility: visible; }
+  .notice-backdrop {
+    position: static; background: none; padding: 0;
+    overflow: visible; display: block;
+  }
+  .notice-sheet { width: 100%; }
+  .notice-actions { display: none; }
+  .notice { padding: 0; border-radius: 0; }
+  .n-block { break-inside: avoid; }
+  .n-table tr { break-inside: avoid; }
+}
+
+/* ── tonight ────────────────────────────────────────────────────────────
+ *
+ * A shift board. Read standing up, in a hurry: time first and large, the
+ * ungranted ones first and marked, everything else quiet.
+ */
+
+.tn-when {
+  font-family: var(--font-label);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.tn-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--s3) var(--s4);
+  margin-bottom: var(--s4);
+  background: var(--bad-soft);
+  border-left: 3px solid var(--bad);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.tn-alert b { font-size: 14px; color: var(--bad); }
+.tn-alert span { font-size: 12.5px; color: var(--text-muted); }
+
+.tn-list { display: grid; gap: var(--s2); }
+
+.tn-item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: var(--s4);
+  align-items: start;
+  padding: var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius);
+}
+.tn-item.ungranted { border-left-color: var(--bad); }
+.tn-item.live { border-left-color: var(--good); }
+
+.tn-time { display: flex; flex-direction: column; }
+.tn-time b {
+  font-family: var(--font-mono);
+  font-size: 21px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.tn-time span { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint); }
+.tn-time em {
+  font-style: normal;
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.tn-body { min-width: 0; }
+.tn-where { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; font-weight: 600; margin-bottom: var(--s2); }
+.tn-where code { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint); }
+
+.tn-flag {
+  font-family: var(--font-label);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.tn-flag.live { background: var(--good-soft); color: var(--good); }
+
+.tn-cost { text-align: right; flex: none; }
+.tn-cost b {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tn-cost span { font-size: 10.5px; color: var(--text-faint); }
+
+/* The row's own controls come from BlockRow, so approving and issuing the
+   notice work here exactly as they do on the plan. Its card chrome is
+   stripped, because this card already provides it. */
+.tn-act { grid-column: 1 / -1; }
+.tn-act .block {
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: none;
+  padding: var(--s3) 0 0;
+  margin: 0;
+}
+.tn-act .block:hover { background: none; }
+.tn-act .when, .tn-act .where, .tn-act .jobs, .tn-act .cost { display: none; }
+.tn-act .acts { margin-left: 0; }
+
+@media (max-width: 720px) {
+  .tn-item { grid-template-columns: 1fr; gap: var(--s3); }
+  .tn-cost { text-align: left; }
+}
