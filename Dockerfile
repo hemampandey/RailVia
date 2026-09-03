@@ -55,14 +55,32 @@ COPY --chown=app:app src/ src/
 # deployment reproduces the same numbers with no API key and no network.
 COPY --chown=app:app data/cache/railradar/ data/cache/railradar/
 COPY --chown=app:app data/grounded_sections.json data/
+# The solved plans, one per month the UI's picker can reach.
+#
+# Without these the container solves on the first request, and a month-long
+# CP-SAT model peaks at 1,148 MB — measured — against a 512 MB instance,
+# which is an OOM kill before the first page renders. They are deterministic
+# and total half a megabyte, so they ship rather than being computed.
+# Regenerate with: python scripts/precompute.py --months 12
+COPY --chown=app:app data/cache/plans/ data/cache/plans/
 COPY --chown=app:app --from=ui /ui/out/ web/out/
 COPY --chown=app:app scripts/ scripts/
-RUN mkdir -p data/cache/plans && chown -R app:app data/cache
 
 ENV PYTHONUNBUFFERED=1
-# Two CP-SAT workers. This is a memory limit, not a speed one: the solve
-# peaks at 369 MB with 2 workers and 651 MB with 8, and a 512 MB container
-# is killed well before that. Two also scored best on plan quality.
+
+# Never build the CP-SAT model in this container.
+#
+# This is the line that makes the image fit. With it the server answers from
+# the plans copied above and peaks at 253 MB; without it the first request
+# builds a month-long model and peaks at 1,148 MB, and a 512 MB instance
+# kills it. A month nobody precomputed still gets an answer — the
+# constructive schedule, labelled as such in the status so it is never
+# mistaken for an optimised plan.
+ENV ALLOW_RUNTIME_SOLVE=0
+
+# Belt and braces. Nothing at run time builds a model while the line above
+# stands, but if someone turns it back on, two workers peak at 369 MB and
+# eight at 651 MB. Two also scored best on plan quality.
 ENV SOLVER_WORKERS=2
 USER app
 EXPOSE 7860

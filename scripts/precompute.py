@@ -46,8 +46,15 @@ def days_in(first: date) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--months", type=int, default=4,
-                    help="how many months from this one to solve")
+    ap.add_argument("--months", type=int, default=12,
+                    help="how many consecutive months to solve. The UI's "
+                         "month picker offers 12 — two back and nine ahead — "
+                         "and any month not solved here falls back to the "
+                         "constructive schedule on a host with runtime "
+                         "solving disabled")
+    ap.add_argument("--from", dest="first", default=None, metavar="YYYY-MM",
+                    help="first month to solve (default: two months back, "
+                         "matching the earliest the picker offers)")
     ap.add_argument("--tasks", type=int, default=120)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--time-limit", type=float, default=None,
@@ -60,12 +67,21 @@ def main() -> int:
 
     budget = args.time_limit if args.time_limit is not None else DEFAULT_UI_BUDGET
     today = date.today()
+    if args.first:
+        year, month = (int(part) for part in args.first.split("-"))
+        start = date(year, month, 1)
+    else:
+        # Two back, because that is the earliest the picker offers and an
+        # unsolved month there is just as visible as an unsolved month ahead.
+        month0 = today.month - 2
+        year0 = today.year + (month0 - 1) // 12
+        start = date(year0, (month0 - 1) % 12 + 1, 1)
     started = time.time()
 
-    print(f"precomputing {args.months} month(s) from {today:%B %Y}, "
+    print(f"precomputing {args.months} month(s) from {start:%B %Y}, "
           f"{budget:.0f}s each, {args.tasks} tasks")
 
-    for first in months_from(date(today.year, today.month, 1), args.months):
+    for first in months_from(start, args.months):
         began = time.time()
         result = plan(
             grounded=True, tasks=args.tasks, days=days_in(first),

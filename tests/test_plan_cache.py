@@ -13,6 +13,7 @@ import json
 import pytest
 
 from src.api import cache
+import src.api.app as app_module
 
 
 @pytest.fixture(autouse=True)
@@ -129,3 +130,25 @@ def test_cache_directory_is_configurable(monkeypatch):
     assert str(cache.CACHE_DIR) == "/tmp/railvia-plans"
     monkeypatch.delenv("PLAN_CACHE_DIR")
     importlib.reload(cache)
+
+
+def test_a_fallback_schedule_is_never_written_to_the_cache(tmp_path, monkeypatch):
+    """The deployed image has runtime solving off, so any month nobody
+    precomputed takes the constructive path. Caching that result wrote an
+    inferior plan to disk permanently — and the UI's month picker offers
+    twelve months, so a visitor could reach one and poison it for the life of
+    the deployment. Recomputing the greedy costs milliseconds.
+    """
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(app_module, "ALLOW_RUNTIME_SOLVE", False)
+    client = TestClient(app_module.app)
+
+    body = client.get("/api/plan", params={
+        "grounded": "false", "tasks": "8", "days": "3", "seed": "77",
+        "time_limit": "3", "horizon_start": "2031-05-01",
+    }).json()
+
+    assert "GREEDY" in body["status"], "expected the constructive fallback"
+    assert list(tmp_path.glob("*.json")) == [], "a fallback plan must not be cached"

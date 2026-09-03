@@ -14,5 +14,9 @@ data/instance.json
 .env.local
 *.key
 web/tsconfig.tsbuildinfo
-data/cache/plans/
+# data/cache/plans/ is deliberately NOT ignored. The solved plans ship in
+# the image: they are deterministic, they total half a megabyte, and solving
+# them at run time needs 1,148 MB against a 512 MB container. Same reasoning
+# as the RailRadar responses above — committed so a deployment reproduces the
+# same numbers with no API key, no network, and no solve.
 web/out/

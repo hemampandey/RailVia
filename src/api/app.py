@@ -390,7 +390,16 @@ def plan(
         "horizon_days": instance.horizon_days,
         "sections": {s.id: s.name for s in instance.sections},
     }
-    cache.store(cache_key, payload)
+    # Only a solved plan is worth keeping.
+    #
+    # The fallback path produces a constructive schedule and labels it
+    # "+GREEDY". Storing that wrote an inferior plan to disk permanently: the
+    # deployed image has runtime solving off, so any month nobody precomputed
+    # got a greedy plan cached forever, and the month picker lets a visitor
+    # reach any month. Recomputing the greedy costs milliseconds; serving a
+    # greedy plan for the rest of the deployment's life does not.
+    if "GREEDY" not in solution.status:
+        cache.store(cache_key, payload)
     return payload
 
 
