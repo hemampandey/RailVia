@@ -1747,3 +1747,22 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
 }
 .rp-why p { margin: var(--s2) 0 0; color: var(--text-muted); line-height: 1.55; }
 .rp-why p b { color: var(--text); }
+
+/* Closures that have already happened. Kept — a planner needs the record —
+   but folded away, because the page opens on work that can still be done. */
+.passed {
+  margin-top: var(--s5);
+  border-top: 1px solid var(--border);
+}
+.passed > summary {
+  font-family: var(--font-label);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: var(--s3) 0;
+  cursor: pointer;
+}
+.passed > summary:hover { color: var(--text-muted); }
+.passed[open] > summary { color: var(--text-muted); }

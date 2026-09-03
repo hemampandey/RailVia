@@ -6,7 +6,35 @@ import { BlockRow } from "@/components/BlockRow";
 import { Fact, Loading } from "@/components/Common";
 import { PeriodPicker } from "@/components/PeriodPicker";
 import { Icon, PATH } from "@/components/icons";
-import { DEPT_VAR, type Dept } from "@/lib/types";
+import { DEPT_VAR, type Block, type Dept } from "@/lib/types";
+
+/** A run of closures with a heading each time the date changes. Its own
+ *  component so the running "current day" resets per list — shared between
+ *  two lists it would suppress the first heading of the second. */
+function BlockList({ blocks }: { blocks: Block[] }) {
+  let currentDay: string | null = null;
+  return (
+    <>
+      {blocks.map((b) => {
+        const day = new Date(b.start).toDateString();
+        const heading = day !== currentDay ? day : null;
+        currentDay = day;
+        return (
+          <div key={b.section_id + b.start}>
+            {heading && (
+              <div className="day">
+                {new Date(heading).toLocaleDateString(undefined, {
+                  weekday: "long", day: "numeric", month: "long", year: "numeric",
+                })}
+              </div>
+            )}
+            <BlockRow block={b} />
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
 export default function PlanPage() {
   const { plan, loading, error, approvals } = usePlanner();
@@ -30,7 +58,13 @@ export default function PlanPage() {
     return matchesSearch && matchesDept;
   });
 
-  let currentDay: string | null = null;
+  /* A month plan is opened in the middle of that month, and the list is in
+     date order — so without this the first thing on the page is a fortnight
+     of closures that already happened and cannot be acted on. They are not
+     hidden, because the record matters, but they go behind the work. */
+  const now = new Date().toISOString();
+  const upcoming = filteredBlocks.filter((b) => b.start >= now);
+  const passed = filteredBlocks.filter((b) => b.start < now);
 
   return (
     <>
@@ -51,8 +85,8 @@ export default function PlanPage() {
         </div>
         <div className="kpi-grid">
           <Fact
-            value={String(plan.block_count)}
-            label="Closures Proposed"
+            value={String(upcoming.length)}
+            label="Closures Still To Come"
           />
           <Fact
             value={`${plan.scheduled}/${plan.task_total}`}
@@ -171,24 +205,29 @@ export default function PlanPage() {
           Try adjusting your search query or department filter.
         </div>
       ) : (
-        filteredBlocks.map((b) => {
-          const day = new Date(b.start).toDateString();
-          const heading = day !== currentDay ? day : null;
-          currentDay = day;
-          return (
-            <div key={b.section_id + b.start}>
-              {heading && (
-                <div className="day">
-                  {new Date(heading).toLocaleDateString(undefined, {
-                    weekday: "long", day: "numeric", month: "long", year: "numeric",
-                  })}
-                </div>
-              )}
-              <BlockRow block={b} />
+        <>
+          {upcoming.length === 0 ? (
+            <div className="empty-state">
+              <b>Nothing left to do this month</b>
+              Every closure in this plan has already passed. Pick a later month
+              to see work that can still be acted on.
             </div>
-          );
-        })
+          ) : (
+            <BlockList blocks={upcoming} />
+          )}
+
+          {passed.length > 0 && (
+            <details className="passed">
+              <summary>
+                {passed.length} closure{passed.length === 1 ? "" : "s"} already
+                passed
+              </summary>
+              <BlockList blocks={passed} />
+            </details>
+          )}
+        </>
       )}
+
     </>
   );
 }
