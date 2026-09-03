@@ -33,7 +33,7 @@ from datetime import date, datetime
 from src.models import CATALOGUE, PlanningInstance, next_monday
 from src.optimiser.model import BlockPlanner
 from src.optimiser.windows import (
-    DEFAULT_PERCENTILE, TimeGrid, feasible_starts, permitted_slots,
+    DEFAULT_PERCENTILE, TimeGrid, feasible_starts, percentile, permitted_slots,
     traffic_by_slot,
 )
 from src.store import (
@@ -884,6 +884,78 @@ def quiet_windows(
         ),
         "permitted_share": round(sum(permitted) / len(permitted), 3),
         "horizon_over": horizon_over,
+    }
+
+
+@app.get("/api/traffic")
+def section_traffic(
+    section_id: str, start: str | None = None, end: str | None = None,
+    grounded: bool = True, tasks: int = 120, days: int = 7, seed: int = 42,
+    horizon_start: str | None = None,
+) -> dict:
+    """The traffic case for one closure: why this hour, and not another.
+
+    A divisional officer being told to hand over the line at 01:15 is owed
+    the reason, and "the optimiser said so" is not one. This returns the
+    section's own daily traffic shape, the threshold that makes an hour
+    blockable at all, and where the chosen window sits against both.
+
+    Arithmetic over data already loaded — no solve, so it costs nothing to
+    open and cannot be the thing that runs the demo box out of memory.
+    """
+    start_date = _parse_start(horizon_start)
+    instance = _load(grounded, tasks, days, seed, start_date)
+    section = next((s for s in instance.sections if s.id == section_id), None)
+    if section is None:
+        raise HTTPException(status_code=404, detail=f"unknown section {section_id}")
+
+    grid = TimeGrid(horizon_start=start_date, horizon_days=days)
+    series = traffic_by_slot(instance, grid)[section_id]
+    threshold = percentile(series, DEFAULT_PERCENTILE)
+    permitted = permitted_slots(series, DEFAULT_PERCENTILE)
+
+    profile = list(section.traffic_density_profile)
+    peak = max(profile)
+
+    window: dict = {}
+    if start and end:
+        try:
+            began, finished = datetime.fromisoformat(start), datetime.fromisoformat(end)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail="start and end must be ISO datetimes"
+            ) from exc
+        origin = grid.to_datetime(0)
+        first = int((began - origin).total_seconds() // 60 // grid.slot_minutes)
+        last = int((finished - origin).total_seconds() // 60 // grid.slot_minutes)
+        first, last = max(0, first), min(len(series), max(first + 1, last))
+        inside = series[first:last]
+        hours = sorted({grid.day_hour(slot)[1] for slot in range(first, last)})
+        window = {
+            "hours": hours,
+            "mean_trains_per_hour": round(sum(inside) / len(inside), 2) if inside else 0.0,
+            "train_hours": round(sum(inside) * grid.slot_hours, 2),
+            # What the same closure would have cost in the section's busiest
+            # hour — the number that shows the placement was not arbitrary.
+            "at_peak_train_hours": round(peak * (last - first) * grid.slot_hours, 2),
+        }
+
+    return {
+        "section_id": section_id,
+        "section_name": section.name,
+        "profile": [round(v, 2) for v in profile],
+        "peak": round(peak, 2),
+        "peak_hour": profile.index(peak),
+        "quietest": round(min(profile), 2),
+        "daily_trains": section.daily_trains,
+        # An hour is blockable only if it is in the section's own quietest
+        # slice. Stated per section, because a flat rule leaves the busiest
+        # trunk with no usable window at all.
+        "threshold": round(threshold, 2),
+        "percentile": DEFAULT_PERCENTILE,
+        "blockable_hours": [h for h, v in enumerate(profile) if v <= threshold],
+        "permitted_share": round(sum(permitted) / len(permitted), 3),
+        "window": window,
     }
 
 

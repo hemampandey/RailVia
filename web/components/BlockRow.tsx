@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ExplainDrawer } from "./ExplainDrawer";
 import { usePlanner } from "./PlannerProvider";
 import { useAuth } from "./AuthProvider";
 import { Icon, PATH } from "./icons";
@@ -28,6 +29,7 @@ export function BlockRow({ block, showDate = false }: {
   const { me } = useAuth();
   const [busy, setBusy] = useState<"approve" | "done" | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [explaining, setExplaining] = useState(false);
 
   const approved = isApproved(block);
   const done = isDone(block);
@@ -109,6 +111,11 @@ export function BlockRow({ block, showDate = false }: {
           <span className="save">⚡ Saves {block.saving.toFixed(1)}h by sharing</span>
         )}
         <div className="acts">
+          <button type="button" className="why-btn"
+            onClick={() => setExplaining(true)}
+            title="Why this section, this hour, these jobs together">
+            Why?
+          </button>
           <button type="button" className={approved ? "on" : ""}
             disabled={!canApprove || busy !== null}
             aria-pressed={approved}
@@ -129,6 +136,9 @@ export function BlockRow({ block, showDate = false }: {
           </button>
         </div>
       </div>
+      {explaining && (
+        <ExplainDrawer block={block} onClose={() => setExplaining(false)} />
+      )}
     </div>
   );
 }

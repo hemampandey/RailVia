@@ -1568,3 +1568,99 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
 .emg-who { margin-left: auto; font-size: 11.5px; color: var(--text-faint); white-space: nowrap; }
 .emg-foot { margin-top: var(--s3); font-size: 12px; color: var(--text-muted); }
 .emg-foot a { color: var(--bad); font-weight: 600; text-decoration: underline; }
+
+/* ── why this closure ───────────────────────────────────────────────────
+ *
+ * A schedule an officer cannot interrogate is a schedule an officer will not
+ * sign. Everything in this panel is already-loaded plan data or arithmetic
+ * over the traffic profile — opening it never re-runs the solver.
+ */
+
+.why-btn { font-weight: 700; color: var(--primary); border-color: var(--primary); }
+.why-btn:hover:not(:disabled) { background: var(--primary-soft); }
+
+.drawer.wide { width: min(560px, 100%); }
+
+.xp {
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--border-soft);
+}
+.xp:last-child { border-bottom: none; }
+
+.xp h4 {
+  margin: 0 0 var(--s2);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+.xp p { margin: 0 0 var(--s2); font-size: 13.5px; line-height: 1.55; color: var(--text-muted); }
+.xp p:last-child { margin-bottom: 0; }
+.xp p b { color: var(--text); }
+.xp .jobs { margin-top: var(--s2); }
+
+.tchart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: var(--s2) 0 var(--s3);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: var(--s2);
+}
+
+/* The counterfactual: what this closure would have cost placed badly. */
+.xp-counter {
+  padding: var(--s2) var(--s3);
+  background: var(--good-soft);
+  border-left: 2px solid var(--good);
+  border-radius: 0 4px 4px 0;
+}
+
+.xp-cost {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  margin-top: var(--s3);
+  padding: var(--s3);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+.xp-cost > div { display: flex; flex-direction: column; }
+.xp-cost span { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); font-weight: 700; }
+.xp-cost b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.xp-cost b.bad { color: var(--bad); }
+.xp-cost b.good { color: var(--good); }
+.xp-cost small { font-size: 10.5px; color: var(--text-faint); }
+.xp-arrow { font-size: 18px; color: var(--text-faint); align-self: center; }
+.xp-save {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--good);
+  background: var(--good-soft);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+}
+.xp-save b { font-size: 13px; font-weight: 800; }
+
+.xp-trains { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: 3px; }
+.xp-trains li {
+  display: flex; align-items: baseline; gap: var(--s2);
+  padding: 5px var(--s3); background: var(--surface-2);
+  border-radius: var(--radius-sm); font-size: 12.5px;
+}
+.xp-trains code { font-family: var(--font-mono); font-weight: 600; color: var(--primary); }
+.xp-trains span { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xp-trains small { margin-left: auto; color: var(--text-faint); font-size: 11px; white-space: nowrap; }
+
+.xp-deferred { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s2); }
+.xp-deferred li {
+  padding: var(--s3);
+  background: var(--surface-2);
+  border-left: 2px solid var(--bad);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.xp-def-h { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; font-size: 13px; }

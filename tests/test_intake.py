@@ -192,3 +192,68 @@ def test_a_finished_month_says_so_rather_than_claiming_the_job_will_not_fit():
     }).json()
     assert too_long["candidates"] == []
     assert too_long["horizon_over"] is False
+
+
+# ── the traffic case behind a closure ───────────────────────────────────
+#
+# "Why 01:15?" is the question a divisional officer actually asks, and
+# "the optimiser said so" is not an answer. These check the figures the
+# explanation panel puts on screen are the same ones the optimiser used.
+
+
+def test_the_threshold_shown_is_the_one_the_optimiser_applied():
+    """If the panel quoted a different rule from the model, the explanation
+    would be a story rather than a reason."""
+    section = _a_section()
+    body = client.get(
+        "/api/traffic", params={**SMALL, "section_id": section}
+    ).json()
+
+    from src.api.app import _load, _parse_start
+    from src.optimiser.windows import percentile
+
+    start = _parse_start(None)
+    grid = TimeGrid(horizon_start=start, horizon_days=3)
+    series = traffic_by_slot(_load(False, 8, 3, 1, start), grid)[section]
+    assert abs(body["threshold"] - percentile(series, DEFAULT_PERCENTILE)) < 0.01
+    assert body["percentile"] == DEFAULT_PERCENTILE
+
+
+def test_every_blockable_hour_is_at_or_under_the_threshold():
+    section = _a_section()
+    body = client.get(
+        "/api/traffic", params={**SMALL, "section_id": section}
+    ).json()
+    for hour in body["blockable_hours"]:
+        assert body["profile"][hour] <= body["threshold"] + 1e-9
+    for hour, value in enumerate(body["profile"]):
+        if value > body["threshold"]:
+            assert hour not in body["blockable_hours"]
+
+
+def test_the_counterfactual_is_never_cheaper_than_the_chosen_window():
+    """The panel claims the same closure in the busiest hour would cost more.
+
+    If that were ever false the claim would be backwards, so it is asserted
+    rather than assumed.
+    """
+    plan = client.get("/api/plan", params={**SMALL, "time_limit": "3"}).json()
+    for block in plan["blocks"][:8]:
+        body = client.get("/api/traffic", params={
+            **SMALL, "section_id": block["section_id"],
+            "start": block["start"], "end": block["end"],
+        }).json()
+        window = body["window"]
+        assert window["at_peak_train_hours"] >= window["train_hours"] - 1e-6
+
+
+def test_a_closure_with_no_window_asked_for_returns_no_window():
+    section = _a_section()
+    body = client.get("/api/traffic", params={**SMALL, "section_id": section}).json()
+    assert body["window"] == {}
+
+
+def test_traffic_for_an_unknown_section_is_a_404():
+    assert client.get(
+        "/api/traffic", params={**SMALL, "section_id": "NOWHERE-AT-ALL"}
+    ).status_code == 404

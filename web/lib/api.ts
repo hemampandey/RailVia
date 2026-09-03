@@ -1,6 +1,6 @@
 import type {
   Activity, Approval, Block, Completion, Impact, Me, Network, Plan, Report,
-  ReportStatus, StoreStatus, WindowQuote,
+  ReportStatus, StoreStatus, TrafficCase, WindowQuote,
 } from "./types";
 
 /** Planning parameters. Kept in one place so every view asks for the same
@@ -202,3 +202,17 @@ export type ReportDraft = Pick<
   "section_id" | "activity_type" | "summary" | "department" | "concerns"
   | "severity" | "emergency" | "duration_minutes" | "crew_required" | "detail"
 >;
+
+/** The traffic case behind one closure. Arithmetic, not a solve — safe to
+ *  open on any box, and it never re-runs the optimiser. */
+export const getTraffic = (
+  sectionId: string, start: string, end: string, p: PlanParams,
+) =>
+  json<TrafficCase>(
+    `${API_ORIGIN}/api/traffic?${new URLSearchParams({
+      section_id: sectionId, start, end,
+      days: String(p.days), tasks: String(p.tasks),
+      grounded: String(p.grounded), seed: "42",
+      ...(p.horizonStart ? { horizon_start: p.horizonStart } : {}),
+    })}`,
+  );

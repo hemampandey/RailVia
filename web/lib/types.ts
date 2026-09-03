@@ -222,3 +222,29 @@ export const DEPT_FULL: Record<Dept, string> = {
   TRD: "Traction distribution — overhead equipment",
   "S&T": "Signal & telecommunications",
 };
+
+/** The traffic case for one closure: why this hour, and not another.
+ *  Everything else the explanation needs is already in the loaded plan. */
+export interface TrafficCase {
+  section_id: string;
+  section_name: string;
+  /** Trains per hour, index 0–23. The section's own daily shape. */
+  profile: number[];
+  peak: number;
+  peak_hour: number;
+  quietest: number;
+  daily_trains: number;
+  /** An hour is blockable only at or below this, measured per section. */
+  threshold: number;
+  percentile: number;
+  blockable_hours: number[];
+  permitted_share: number;
+  window: {
+    hours: number[];
+    mean_trains_per_hour: number;
+    train_hours: number;
+    /** The same closure in the section's busiest hour — the counterfactual
+     *  that shows the placement was not arbitrary. */
+    at_peak_train_hours: number;
+  } | Record<string, never>;
+}
