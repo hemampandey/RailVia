@@ -8,7 +8,6 @@ import { ThemeToggle } from "./ThemeToggle";
 import { usePlanner } from "./PlannerProvider";
 import { useAuth } from "./AuthProvider";
 import { ROLE_LABEL, DIVISIONS } from "@/lib/types";
-import { getReports } from "@/lib/api";
 
 /* Intake first: a defect exists before a plan for it does. */
 const NAV = [
@@ -22,23 +21,15 @@ const NAV = [
 
 export function Sidebar() {
   const path = usePathname();
-  const { plan, approvals, completions, division, setDivision } = usePlanner();
+  const { plan, approvals, completions, reports, division, setDivision } = usePlanner();
   const { me, session, signOut, error: authError } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const [openReports, setOpenReports] = useState(0);
 
-  /* Reports waiting on the head. Fetched here rather than in the intake page
-     so the badge is visible from every view — an emergency defect nobody has
-     looked at is exactly the thing that must not need a click to discover. */
-  useEffect(() => {
-    const token = session?.access_token;
-    if (!token) { setOpenReports(0); return; }
-    let live = true;
-    getReports(token)
-      .then((r) => { if (live) setOpenReports(r.reports.filter((x) => x.status === "open").length); })
-      .catch(() => { /* the intake page reports the reason */ });
-    return () => { live = false; };
-  }, [session?.access_token]);
+  /* Reports waiting on the head, from the shared store. An emergency defect
+     nobody has looked at is exactly the thing that must not need a click to
+     discover, so the count rides on the nav from every view. */
+  const waiting = reports.filter((r) => r.status === "open");
+  const urgent = waiting.filter((r) => r.emergency).length;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -51,7 +42,8 @@ export function Sidebar() {
     // Checked before the plan guard: a waiting report matters whether or
     // not a plan has finished loading.
     if (href === "/report") {
-      return openReports ? { text: String(openReports), warn: true } : null;
+      if (urgent) return { text: `${urgent}!`, warn: true };
+      return waiting.length ? { text: String(waiting.length), warn: true } : null;
     }
     if (!plan) return null;
     if (href === "/calendar") return { text: String(plan.block_count) };

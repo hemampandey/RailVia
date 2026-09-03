@@ -5,11 +5,10 @@ import { useAuth } from "@/components/AuthProvider";
 import { usePlanner } from "@/components/PlannerProvider";
 import { Loading, SetupBanner } from "@/components/Common";
 import {
-  decideReport, fileReport, getActivities, getReports, getWindows,
-  type ReportDraft,
+  decideReport, fileReport, getActivities, getWindows, type ReportDraft,
 } from "@/lib/api";
 import {
-  DEPTS, DEPT_FULL, DEPT_VAR, SEVERITY_LABEL, STATUS_LABEL,
+  DEPTS, DEPT_FULL, DEPT_VAR, STATUS_LABEL,
   type Activity, type Block, type Dept, type Report, type ReportStatus,
   type WindowQuote,
 } from "@/lib/types";
@@ -52,34 +51,29 @@ const EMPTY: ReportDraft = {
 };
 
 export default function ReportPage() {
-  const { plan, store, loading, error, params } = usePlanner();
+  const {
+    plan, store, loading, error, params, reports, reloadReports, reportsError,
+  } = usePlanner();
   const { session, me } = useAuth();
   const token = session?.access_token;
 
   const [tab, setTab] = useState<"new" | "register">("new");
   const [draft, setDraft] = useState<ReportDraft>(EMPTY);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [reports, setReports] = useState<Report[]>([]);
   const [quote, setQuote] = useState<WindowQuote | null>(null);
   const [busy, setBusy] = useState(false);
   const [filed, setFiled] = useState<Report | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [needsSchema, setNeedsSchema] = useState(false);
+  const [schemaProblem, setSchemaProblem] = useState(false);
+
+  // The table is missing either way; the provider notices it on load, this
+  // page notices it on a failed write.
+  const needsSchema = schemaProblem || (!!reportsError && missingTable(reportsError));
 
   const set = useCallback(
     (patch: Partial<ReportDraft>) => setDraft((d) => ({ ...d, ...patch })), []);
 
   useEffect(() => { getActivities().then((a) => setActivities(a.activities)).catch(() => {}); }, []);
-
-  const refresh = useCallback(() => {
-    if (!token) return;
-    getReports(token)
-      .then((r) => { setReports(r.reports); setNeedsSchema(false); })
-      .catch((e: unknown) => {
-        setNeedsSchema(missingTable(e instanceof Error ? e.message : String(e)));
-      });
-  }, [token]);
-  useEffect(refresh, [refresh]);
 
   /* Default the section to the first one, once the plan names them. */
   useEffect(() => {
@@ -128,13 +122,22 @@ export default function ReportPage() {
     setBusy(true);
     setProblem(null);
     try {
-      const saved = await fileReport(draft, token);
+      // Severity is derived, not asked. A five-point scale in front of
+      // someone standing next to a defect is bureaucracy: the decision that
+      // actually changes anything is whether it waits for the next cycle.
+      // The field stays, because a report becomes a Task later and a Task
+      // needs one — it is just not the reporter's to grade.
+      const saved = await fileReport(
+        { ...draft, severity: draft.emergency ? 5 : 3 }, token,
+      );
       setFiled(saved);
       setDraft({ ...EMPTY, section_id: draft.section_id });
-      refresh();
+      // Shared state, so an emergency filed here lights up the calendar
+      // banner and the sidebar badge without a reload.
+      reloadReports();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      setNeedsSchema(missingTable(message));
+      setSchemaProblem(missingTable(message));
       setProblem(missingTable(message) ? null : message);
     } finally {
       setBusy(false);
@@ -144,8 +147,8 @@ export default function ReportPage() {
   const decide = async (report: Report, status: ReportStatus) => {
     if (!token) return;
     try {
-      const updated = await decideReport(report.id, status, "", token);
-      setReports((rs) => rs.map((r) => (r.id === report.id ? updated : r)));
+      await decideReport(report.id, status, "", token);
+      reloadReports();
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
     }
@@ -276,20 +279,6 @@ export default function ReportPage() {
                 actually be placed. Choosing one fills in its usual duration
                 and crew — correct them if this job differs.
               </p>
-            </div>
-
-            <div className="field">
-              <label>How bad is it?</label>
-              <div className="sev-scale">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} type="button"
-                    className={"sev" + (draft.severity === n ? " on" : "")}
-                    aria-pressed={draft.severity === n}
-                    onClick={() => set({ severity: n })}>
-                    <b>{n}</b><span>{SEVERITY_LABEL[n]}</span>
-                  </button>
-                ))}
-              </div>
             </div>
 
             <label className={"emergency" + (draft.emergency ? " on" : "")}>
@@ -519,8 +508,7 @@ function Register({ reports, canDecide, sections, onDecide, problem }: {
                 </span>
                 <span className="hint">
                   {r.activity_type.replace(/_/g, " ")} ·{" "}
-                  {hours(r.duration_minutes)} · {r.crew_required} crew ·
-                  {" "}severity {r.severity} {SEVERITY_LABEL[r.severity]}
+                  {hours(r.duration_minutes)} · {r.crew_required} crew
                 </span>
               </div>
               {r.detail && <p className="rep-detail">{r.detail}</p>}

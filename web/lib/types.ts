@@ -209,14 +209,6 @@ export interface WindowQuote {
   horizon_over: boolean;
 }
 
-export const SEVERITY_LABEL: Record<number, string> = {
-  1: "Cosmetic",
-  2: "Minor",
-  3: "Moderate",
-  4: "Serious",
-  5: "Safety-critical",
-};
-
 export const STATUS_LABEL: Record<ReportStatus, string> = {
   open: "Awaiting the head",
   accepted: "Accepted into the backlog",

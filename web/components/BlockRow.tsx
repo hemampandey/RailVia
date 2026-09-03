@@ -33,13 +33,20 @@ export function BlockRow({ block, showDate = false }: {
   const done = isDone(block);
   const connected = !!store?.connected;
 
-  const canApprove = connected && !!me?.can_approve;
+  /* A closure that has already happened cannot be granted. Leaving the
+     button live invites approving last Tuesday, which is the kind of thing
+     that makes a planning tool look like a mock-up. */
+  const isPast = new Date(block.start) < new Date();
+
+  const canApprove = connected && !!me?.can_approve && !isPast;
   const canComplete = connected && !!me?.can_complete;
   const approveWhy = !connected
     ? "Connect Supabase to record decisions"
-    : me?.can_approve
-      ? undefined
-      : "Only the divisional head can grant a closure";
+    : !me?.can_approve
+      ? "Only the divisional head can grant a closure"
+      : isPast
+        ? "This closure has already passed — it can no longer be granted"
+        : undefined;
 
   const start = new Date(block.start);
   const end = new Date(block.end);
@@ -57,7 +64,7 @@ export function BlockRow({ block, showDate = false }: {
   return (
     <div className={"block" + (block.shared ? " shared" : "")
       + (block.overdue_count && !done ? " has-overdue" : "")
-      + (done ? " done" : "")}>
+      + (done ? " done" : "") + (isPast ? " past" : "")}>
       <div className="when">
         <div>{start.toTimeString().slice(0, 5)}–{end.toTimeString().slice(0, 5)}</div>
         <small>
@@ -108,7 +115,9 @@ export function BlockRow({ block, showDate = false }: {
             title={approveWhy}
             onClick={() => run("approve", () => toggleApproval(block))}>
             {approved && <Icon d={PATH.check} size={13} />}
-            {busy === "approve" ? "…" : approved ? "Approved" : "Approve"}
+            {busy === "approve" ? "…"
+              : approved ? "Approved"
+                : isPast ? "Passed" : "Approve"}
           </button>
           <button type="button" className={done ? "on" : ""}
             disabled={!canComplete || busy !== null}

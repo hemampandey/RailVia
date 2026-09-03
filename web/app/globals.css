@@ -1342,27 +1342,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   color: var(--text-faint);
 }
 
-/* Severity as a scale rather than a dropdown: the point is that 1 and 5 are
-   different in kind, and a list of five words hides that. */
-.sev-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s2); }
-
-.sev {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: var(--s2) 4px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.sev b { font-size: 15px; font-weight: 800; }
-.sev span { font-size: 9.5px; text-align: center; color: var(--text-faint); line-height: 1.2; }
-.sev.on { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
-.sev.on span { color: var(--bad); }
-
 .emergency {
   display: flex;
   gap: var(--s3);
@@ -1489,3 +1468,103 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
 
 .rep-status.open { background: var(--accent-soft); color: var(--accent); }
 .rep-status.accepted { background: var(--good-soft); color: var(--good); }
+
+/* ── time, on the calendar ──────────────────────────────────────────────
+ *
+ * A month plan is read in the middle of that month, so the grid has to say
+ * which part of it has already happened. Without this the calendar shows a
+ * fortnight of closures that cannot be acted on, with live Approve buttons
+ * on all of them.
+ *
+ * Ordering matters: these come after .cell.busy so they win at equal
+ * specificity.
+ */
+
+.cell.past {
+  background: var(--surface-2);
+  opacity: 0.55;
+  border-style: dashed;
+}
+.cell.past:hover:not(.empty) { opacity: 0.72; }
+.cell.past .th, .cell.past .n { color: var(--text-faint); }
+
+.cell.today {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+/* An emergency is a request nobody has scheduled yet, so it sits on today —
+   "as soon as possible" is the only date it has. */
+.cell.urgent {
+  border-color: var(--bad);
+  box-shadow: inset 0 0 0 1px var(--bad);
+  background: var(--bad-soft);
+}
+
+.day-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--primary);
+  background: var(--primary-soft);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.day-tag.past { color: var(--text-faint); background: var(--surface-3); }
+
+.cell-emg {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bad);
+  margin-top: 2px;
+}
+
+.block.past { opacity: 0.62; border-left-style: dashed; }
+
+/* ── the emergency banner ───────────────────────────────────────────── */
+
+.emg {
+  border: 1px solid var(--bad);
+  border-left: 3px solid var(--bad);
+  background: var(--bad-soft);
+  border-radius: var(--radius);
+  padding: var(--s4);
+  margin-bottom: var(--s4);
+}
+
+.emg-head { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.emg-head b { font-size: 14px; color: var(--text); }
+
+.emg-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--on-primary);
+  background: var(--bad);
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+
+.emg-list { list-style: none; margin: var(--s3) 0 0; padding: 0; display: grid; gap: var(--s2); }
+
+.emg-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2) var(--s3);
+  padding: var(--s2) var(--s3);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.emg-where { font-weight: 700; display: inline-flex; align-items: baseline; gap: 6px; }
+.emg-where code { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); }
+.emg-what { color: var(--text-muted); }
+.emg-who { margin-left: auto; font-size: 11.5px; color: var(--text-faint); white-space: nowrap; }
+.emg-foot { margin-top: var(--s3); font-size: 12px; color: var(--text-muted); }
+.emg-foot a { color: var(--bad); font-weight: 600; text-decoration: underline; }

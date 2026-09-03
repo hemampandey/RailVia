@@ -5,9 +5,11 @@ import {
 } from "react";
 import {
   approve as apiApprove, completeJob, DEFAULT_PARAMS, getDecisions, getPlan,
-  getStore, PlanParams, unapprove as apiUnapprove, uncompleteJob,
+  getReports, getStore, PlanParams, unapprove as apiUnapprove, uncompleteJob,
 } from "@/lib/api";
-import type { Approval, Block, Completion, Division, Plan, StoreStatus } from "@/lib/types";
+import type {
+  Approval, Block, Completion, Division, Plan, Report, StoreStatus,
+} from "@/lib/types";
 import { blockKey, DIVISIONS } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 
@@ -23,6 +25,13 @@ interface Ctx {
   store: StoreStatus | null;
   approvals: Map<string, Approval>;
   completions: Map<string, Completion>;
+  /** Field reports, shared so the sidebar badge and the calendar's emergency
+   *  banner come from one fetch rather than each view asking separately. */
+  reports: Report[];
+  reloadReports: () => void;
+  /** Why reports could not be loaded — most often the `reports` table has
+   *  not been created yet, which the intake page names specifically. */
+  reportsError: string | null;
   params: PlanParams;
   division: Division;
   setDivision: (d: Division) => void;
@@ -53,6 +62,8 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const [store, setStore] = useState<StoreStatus | null>(null);
   const [approvals, setApprovals] = useState<Map<string, Approval>>(new Map());
   const [completions, setCompletions] = useState<Map<string, Completion>>(new Map());
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportsError, setReportsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -97,6 +108,20 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [params, tick, token]);
 
+  /* Reports are not keyed to an instance — a defect is a fact about the
+     track, not about whichever month happens to be open — so they load on
+     their own rather than with the plan. */
+  const reloadReports = useCallback(() => {
+    if (!token) { setReports([]); return; }
+    getReports(token)
+      .then((r) => { setReports(r.reports); setReportsError(null); })
+      .catch((e: unknown) => {
+        setReportsError(e instanceof Error ? e.message : String(e));
+      });
+  }, [token]);
+
+  useEffect(reloadReports, [reloadReports, tick]);
+
   const setParams = useCallback((patch: Partial<PlanParams>) => {
     setParamsState((p) => ({ ...p, ...patch }));
   }, []);
@@ -134,10 +159,12 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   }, [plan, completions, token]);
 
   const value = useMemo<Ctx>(() => ({
-    plan, store, approvals, completions, params, division, setDivision, loading, error,
+    plan, store, approvals, completions, reports, reloadReports, reportsError,
+    params, division, setDivision, loading, error,
     setParams, reload: () => setTick((t) => t + 1),
     toggleApproval, toggleDone, isApproved, isDone,
-  }), [plan, store, approvals, completions, params, division, setDivision, loading, error,
+  }), [plan, store, approvals, completions, reports, reloadReports, reportsError,
+    params, division, setDivision, loading, error,
     setParams, toggleApproval, toggleDone, isApproved, isDone]);
 
   return (

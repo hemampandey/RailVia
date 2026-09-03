@@ -10,7 +10,9 @@ import { DayDetailModal } from "@/components/DayDetailModal";
 import { DEPT_VAR, type Block, type Dept } from "@/lib/types";
 
 export default function CalendarPage() {
-  const { plan, loading, error, approvals, completions, isApproved, division } = usePlanner();
+  const {
+    plan, loading, error, approvals, completions, isApproved, division, reports,
+  } = usePlanner();
   const [selected, setSelected] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "gantt">("grid");
   const [deptFilter, setDeptFilter] = useState<Dept | "ALL">("ALL");
@@ -30,6 +32,15 @@ export default function CalendarPage() {
     if (!byDay.has(k)) byDay.set(k, []);
     byDay.get(k)!.push(b);
   }
+
+  /* Midnight today, so a day is "past" by date rather than by clock time —
+     a closure at 02:00 this morning is history, but today's cell is not. */
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  /* Emergencies still waiting on the head. These are requests, not placements:
+     nothing has scheduled them, and the calendar must not imply otherwise. */
+  const emergencies = reports.filter((r) => r.emergency && r.status === "open");
 
   const first = new Date(plan.horizon_start + "T00:00:00");
   const lead = (first.getDay() + 6) % 7; // 0 = Monday
@@ -85,6 +96,36 @@ export default function CalendarPage() {
           )}
         </div>
       </div>
+
+      {emergencies.length > 0 && (
+        <div className="emg" role="alert">
+          <div className="emg-head">
+            <span className="emg-tag">Emergency</span>
+            <b>
+              {emergencies.length} report{emergencies.length === 1 ? "" : "s"} cannot
+              wait for the next planning cycle
+            </b>
+          </div>
+          <ul className="emg-list">
+            {emergencies.map((r) => (
+              <li key={r.id}>
+                <span className="emg-where">
+                  {plan.sections[r.section_id] ?? r.section_id}
+                  <code>{r.section_id}</code>
+                </span>
+                <span className="emg-what">{r.summary}</span>
+                <span className="emg-who">
+                  {[r.department, ...r.concerns].join(" + ")} · {r.reported_by}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="emg-foot">
+            Raised from the field and not yet placed in a plan — the divisional
+            head decides these on the <a href="/report">Raise a job</a> register.
+          </div>
+        </div>
+      )}
 
       {/* Controls Bar: Department Filter & View Switcher */}
       <div className="controls-bar">
@@ -169,24 +210,42 @@ export default function CalendarPage() {
               const hours = blocks.reduce((a, b) => a + b.train_hours, 0);
               const ok = blocks.filter(isApproved).length;
               const depts = [...new Set(blocks.flatMap((b) => b.departments))];
+              const past = day < startOfToday;
+              const today = day.getTime() === startOfToday.getTime();
+              // Emergencies sit on today, because "as soon as possible" is
+              // the only date a request that has not been scheduled has.
+              const urgent = today && emergencies.length > 0;
 
               return (
                 <button
                   type="button"
                   key={key}
-                  className={"cell" + (blocks.length ? " busy" : "")}
+                  className={"cell" + (blocks.length ? " busy" : "")
+                    + (past ? " past" : "") + (today ? " today" : "")
+                    + (urgent ? " urgent" : "")}
                   aria-pressed={selected === key}
-                  aria-label={`${key}: ${blocks.length} closures, ${hours.toFixed(1)} train-hours lost`}
+                  aria-label={
+                    `${key}: ${blocks.length} closures, ${hours.toFixed(1)} train-hours lost`
+                    + (past ? ", already past" : "")
+                    + (urgent ? `, ${emergencies.length} emergency reports waiting` : "")
+                  }
                   onClick={() => setSelected(selected === key ? null : key)}
                 >
                   <div className="d">
                     <span>{day.getDate()}</span>
-                    {blocks.length > 0 && ok > 0 && (
+                    {today && <span className="day-tag">Today</span>}
+                    {past && blocks.length > 0 && <span className="day-tag past">Done</span>}
+                    {!past && !today && blocks.length > 0 && ok > 0 && (
                       <span style={{ fontSize: 10, color: "var(--good)", fontWeight: 700 }}>
                         {ok}/{blocks.length} ok
                       </span>
                     )}
                   </div>
+                  {urgent && (
+                    <div className="cell-emg">
+                      {emergencies.length} emergency
+                    </div>
+                  )}
                   <div className="n">
                     {blocks.length
                       ? `${blocks.length} closure${blocks.length > 1 ? "s" : ""}`
