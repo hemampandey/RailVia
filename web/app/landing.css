@@ -300,3 +300,100 @@
   opacity: 0.55;
   z-index: 1;
 }
+
+/* ── the brand mark ─────────────────────────────────────────────────
+   The logo sits in the same 30px square the drawn glyph did, so the header
+   does not reflow when the image arrives. object-fit keeps whatever aspect
+   the file has without distorting it. */
+.lp-mark-img { padding: 0; overflow: hidden; background: transparent; }
+.lp-mark-img img {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+}
+
+/* ── the three departments ──────────────────────────────────────────
+ *
+ * Alternating rows rather than a card grid. Three cards side by side give
+ * each department a caption; a full row gives it a photograph and room to
+ * say why it needs the track, which is the thing the page is arguing about.
+ */
+.lp-depts .lp-dept-rows {
+  display: grid;
+  gap: 72px;
+  margin-top: 56px;
+}
+
+.lp-dept-row {
+  display: grid;
+  /* Equal columns. An uneven split gave the image more room in odd rows
+     and less in even ones, so alternating sides also alternated the picture
+     size — the rhythm read as a mistake rather than a rhythm. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 44px;
+  align-items: center;
+}
+
+/* Every other row turns over, so the eye is not marching down one column.
+   Order rather than direction: reversing with `direction` would flip the
+   text too. */
+.lp-dept-row:nth-child(even) .lp-dept-img { order: 2; }
+
+.lp-dept-img {
+  position: relative;
+  margin: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-line);
+  /* Reserved before the image loads, so the row does not jump. */
+  aspect-ratio: 1200 / 670;
+}
+.lp-dept-img img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+
+/* The department's colour, carried onto the photograph as a bar down its
+   leading edge — the same three hues used everywhere else in the product. */
+.lp-dept-edge {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+}
+
+.lp-dept-body { min-width: 0; }
+
+.lp-dept-code {
+  display: inline-flex; align-items: center; gap: 7px;
+  font: 700 12px/1 var(--lp-label);
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.lp-dept-code i { width: 8px; height: 8px; border-radius: 50%; }
+
+.lp-dept-body h3 {
+  font: 700 clamp(22px, 2.6vw, 30px)/1.15 var(--lp-display);
+  letter-spacing: -0.022em;
+  margin: 12px 0 10px;
+}
+.lp-dept-body p {
+  color: var(--lp-ink-2);
+  margin: 0 0 12px;
+  max-width: 46ch;
+}
+.lp-dept-holds { color: var(--lp-ink) !important; font-weight: 600; }
+
+.lp-dept-sys {
+  margin-top: 18px; padding-top: 14px;
+  border-top: 1px solid var(--lp-line-soft);
+  font: 500 13px/1.5 var(--lp-mono);
+  color: var(--lp-ink-3);
+}
+.lp-dept-sys b { color: var(--lp-ink); font-weight: 600; }
+.lp-dept-sys span { display: block; margin-top: 2px; }
+
+@media (max-width: 860px) {
+  .lp-depts .lp-dept-rows { gap: 48px; }
+  .lp-dept-row { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  /* Stacked, the picture always leads — the alternation only reads as
+     rhythm when there are two columns to alternate between. */
+  .lp-dept-row:nth-child(even) .lp-dept-img { order: 0; }
+}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   CountUp, Lift, MotionRoot, RailProgress, Reveal, Stagger, StaggerItem,
 } from "@/components/landing-motion";
+import { BrandMark } from "@/components/BrandMark";
 
 /* The landing page. Public — a judge should be able to understand what this
    is without an account.
@@ -11,14 +12,56 @@ import {
    the jobs and both figures are real, taken from the planner's own output for
    Faridabad Nw Tn – Ballabgarh. */
 
-const RAIL_ICON = "M4 6h16M4 12h16M4 18h10";
-
 /* Today's three closures on FDN–BVH, as the manual process produces them:
    each department asks separately, so the track is handed over three times. */
 const TODAY = [
   { x: 96,  w: 104, dept: "S&T",  colour: "var(--lp-snt)", job: "cable megger test",       hours: 6.25 },
   { x: 236, w: 78,  dept: "S&T",  colour: "var(--lp-snt)", job: "track circuit adjustment", hours: 7.25 },
   { x: 470, w: 128, dept: "ENGG", colour: "var(--lp-engg)", job: "usfd rail testing",       hours: 11.0 },
+];
+
+/* The three departments, each with a photograph of what it actually
+   maintains. They were cards once — a tag, a line of text and a system name —
+   which said the same thing three times over and showed nothing. A picture of
+   the rail, the wire and the signal does the work those cards were trying to
+   do, and makes the point the page is built on: this is all the same track. */
+const DEPARTMENTS = [
+  {
+    code: "ENGG",
+    name: "Permanent way",
+    colour: "var(--lp-engg)",
+    image: "/images/departments/engg.webp",
+    alt: "Track under maintenance — rails, sleepers and ballast",
+    holds: "Rails, sleepers, ballast, points and crossings.",
+    needs:
+      "Tamping, destressing and ultrasonic testing all need the line clear "
+      + "and the machines on it. This is the longest work of the three.",
+    system: "TMS",
+  },
+  {
+    code: "TRD",
+    name: "Traction distribution",
+    colour: "var(--lp-trd)",
+    image: "/images/departments/trd.webp",
+    alt: "Overhead line equipment above the track",
+    holds: "The overhead line the trains draw power from.",
+    needs:
+      "Nothing may be worked on live. An isolation and an earth are needed "
+      + "before anyone goes near the wire — including other departments.",
+    system: "TDMS",
+  },
+  {
+    code: "S&T",
+    name: "Signal & telecom",
+    colour: "var(--lp-snt)",
+    image: "/images/departments/snt.webp",
+    alt: "Lineside signalling equipment",
+    holds: "Signals, point machines, track circuits, cabling.",
+    needs:
+      "A point machine cannot be opened while trains are being signalled "
+      + "over it, so this work waits for the same quiet hours as the rest.",
+    system: "SMMS",
+  },
 ];
 
 export default function Landing() {
@@ -36,12 +79,7 @@ export default function Landing() {
         <RailProgress />
         <header className="lp-top">
           <div className="lp-brand">
-            <span className="lp-mark" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
-                <path d={RAIL_ICON} />
-              </svg>
-            </span>
+            <BrandMark />
             RailVia
           </div>
         </header>
@@ -319,6 +357,42 @@ export default function Landing() {
               times — and each time, that train waits.
             </figcaption>
           </figure>
+        </section>
+
+        {/* ── the three departments, one at a time ── */}
+        <section className="lp-section lp-depts">
+          <Reveal>
+          <h2>Each one holds a different part of the same track</h2>
+          <p>
+            None of them is wrong to want the line. Every one of these jobs is
+            mandated, and every one needs the track clear to do. The problem
+            is only that they ask separately.
+          </p>
+          </Reveal>
+
+          <div className="lp-dept-rows">
+            {DEPARTMENTS.map((d, i) => (
+              <Reveal key={d.code} className="lp-dept-row" delay={0.05}>
+                <figure className="lp-dept-img">
+                  <img src={d.image} alt={d.alt} width={1200} height={670}
+                       loading="lazy" decoding="async" />
+                  <span className="lp-dept-edge" style={{ background: d.colour }} />
+                </figure>
+                <div className="lp-dept-body">
+                  <span className="lp-dept-code" style={{ color: d.colour }}>
+                    <i style={{ background: d.colour }} />{d.code}
+                  </span>
+                  <h3>{d.name}</h3>
+                  <p className="lp-dept-holds">{d.holds}</p>
+                  <p>{d.needs}</p>
+                  <div className="lp-dept-sys">
+                    raises its work through <b>{d.system}</b>
+                    <span>— which the other two cannot see</span>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </section>
 
         {/* ── what it does ── */}
