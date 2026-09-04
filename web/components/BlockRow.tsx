@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BlockNotice } from "./BlockNotice";
 import { ExplainDrawer } from "./ExplainDrawer";
+import { Portal } from "./Portal";
 import { usePlanner } from "./PlannerProvider";
 import { useAuth } from "./AuthProvider";
 import { Icon, PATH } from "./icons";
@@ -143,12 +144,19 @@ export function BlockRow({ block, showDate = false }: {
           </button>
         </div>
       </div>
+      {/* Portalled out of this row. `.block.done` and `.block.past` dim
+          themselves with opacity, which composites every descendant — these
+          panels included — so rendered here they came out faded. */}
       {explaining && (
-        <ExplainDrawer block={block} onClose={() => setExplaining(false)} />
+        <Portal>
+          <ExplainDrawer block={block} onClose={() => setExplaining(false)} />
+        </Portal>
       )}
       {issuing && (
-        <BlockNotice block={block} approval={approvals.get(blockKey(block))}
-          onClose={() => setIssuing(false)} />
+        <Portal>
+          <BlockNotice block={block} approval={approvals.get(blockKey(block))}
+            onClose={() => setIssuing(false)} />
+        </Portal>
       )}
     </div>
   );
