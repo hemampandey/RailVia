@@ -1,6 +1,7 @@
 "use client";
 
 import { usePlanner } from "./PlannerProvider";
+import { TrainLoader } from "./TrainLoader";
 
 export const Fact = ({ value, label, tone, progress }: {
   value: string;
@@ -24,7 +25,10 @@ export const Fact = ({ value, label, tone, progress }: {
 export function Loading({ what }: { what: string }) {
   return (
     <>
-      <div className="status"><div className="spin" />{what}</div>
+      <div className="tl-wrap">
+        <TrainLoader label={what} />
+        <div className="tl-say">{what}</div>
+      </div>
       {[0, 1, 2].map((i) => <div className="sk" key={i} />)}
     </>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { Icon, PATH } from "./icons";
+import { TrainLoader } from "./TrainLoader";
 
 /** Everything behind a sign-in.
  *
@@ -43,7 +44,12 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const { signIn } = useAuth();
 
   if (loading) {
-    return <div className="status"><div className="spin" />Checking your session…</div>;
+    return (
+      <div className="tl-wrap tl-route">
+        <TrainLoader label="Checking your session" />
+        <div className="tl-say">Checking your session…</div>
+      </div>
+    );
   }
   if (session) return <>{children}</>;
 

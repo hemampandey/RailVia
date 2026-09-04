@@ -754,6 +754,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--s3);
+  padding: 12px;
 }
 .panel h3 {
   margin: 0;
@@ -2292,3 +2293,84 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
   font-size: 10.5px;
   color: var(--text-faint);
 }
+
+/* ── the loading train ──────────────────────────────────────────────────
+ *
+ * The engine stays put and the ground runs beneath it. A loader that
+ * travelled would have to leave the frame, and this one waits as long as the
+ * solve does — twenty seconds on a cold month.
+ *
+ * Every rate here is deliberately unhurried. A frantic spinner makes a slow
+ * wait feel broken; a steady one makes it feel like work in progress.
+ */
+
+.tl {
+  display: block;
+  width: 132px;
+  height: 132px;
+  overflow: visible;
+}
+
+/* Wheels. transform-box: fill-box would recentre each on its own bounding
+   box, which is not where the axle is — the origin is set per wheel in user
+   units instead, from the circle the artwork already places. */
+.tl-wheel {
+  transform-box: view-box;
+  animation: tl-roll 1.9s linear infinite;
+}
+
+/* Rail and ballast at different rates: one sliding stripe reads as a stripe,
+   two at different speeds read as ground going past. */
+.tl-rail { animation: tl-run 0.85s linear infinite; }
+.tl-ballast { animation: tl-run 1.5s linear infinite; }
+
+/* Springs. Two pixels in five hundred — enough to feel alive, not enough to
+   look like it is bouncing. */
+.tl-body { animation: tl-ride 0.9s ease-in-out infinite; }
+
+.tl-puff { opacity: 0; animation: tl-exhaust 2.4s ease-out infinite; }
+.tl-puff2 { animation-delay: 0.8s; }
+.tl-puff3 { animation-delay: 1.6s; }
+
+@keyframes tl-roll { to { transform: rotate(360deg); } }
+@keyframes tl-run { to { stroke-dashoffset: -48; } }
+@keyframes tl-ride {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes tl-exhaust {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
+  15% { opacity: 0.45; }
+  100% { opacity: 0; transform: translate(-70px, -58px) scale(1.9); }
+}
+
+/* Loading states built around it. */
+.tl-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s6) var(--s4);
+}
+.tl-say {
+  font-family: var(--font-label);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-wheel, .tl-rail, .tl-ballast, .tl-body, .tl-puff {
+    animation: none;
+  }
+  /* Left at rest the exhaust would be three invisible circles; showing the
+     first keeps the drawing complete rather than half-drawn. */
+  .tl-puff1 { opacity: 0.35; }
+}
+
+/* The route-level wait has no page around it yet, so it centres in the
+   viewport rather than sitting at the top of an empty one. */
+.tl-route { min-height: 70vh; justify-content: center; }
