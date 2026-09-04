@@ -171,7 +171,7 @@
   margin-top: 20px; padding-top: 16px;
   border-top: 1px solid var(--lp-line-soft);
   font-size: 14.5px; color: var(--lp-ink-2); line-height: 1.6;
-  max-width: 72ch;
+  max-width: 80ch;
 }
 .lp-demo figcaption b { color: var(--lp-ink); font-weight: 600; }
 
@@ -288,4 +288,15 @@
 @media (max-width: 720px) {
   .lp-scene { padding: 18px 14px 14px; }
   .lp-scene svg { min-width: 640px; }
+}
+
+/* The travelled part of the spine, drawn over the faint full line as the
+   page is scrolled. Same geometry, stronger colour — the page lays track
+   behind you. */
+.lp-rail-draw {
+  width: 2px;
+  background: linear-gradient(
+    to bottom, transparent, var(--lp-rail) 4%, var(--lp-rail) 96%, transparent);
+  opacity: 0.55;
+  z-index: 1;
 }

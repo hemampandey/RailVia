@@ -1,4 +1,7 @@
 import Link from "next/link";
+import {
+  CountUp, Lift, MotionRoot, RailProgress, Reveal, Stagger, StaggerItem,
+} from "@/components/landing-motion";
 
 /* The landing page. Public — a judge should be able to understand what this
    is without an account.
@@ -20,9 +23,17 @@ const TODAY = [
 
 export default function Landing() {
   return (
+    <MotionRoot>
     <div className="lp">
+      {/* Framer bakes its `initial` state into the static export, so every
+          revealed block ships as opacity:0. With scripts blocked nothing
+          would ever put them back, and this public page — the one a judge
+          opens first — would render blank. */}
+      <noscript>
+        <style>{"[data-reveal]{opacity:1!important;transform:none!important}"}</style>
+      </noscript>
       <div className="lp-wrap">
-        <div className="lp-rail" aria-hidden="true" />
+        <RailProgress />
         <header className="lp-top">
           <div className="lp-brand">
             <span className="lp-mark" aria-hidden="true">
@@ -37,25 +48,35 @@ export default function Landing() {
 
         {/* ── hero ── */}
         <section className="lp-hero">
+          <Stagger>
+          <StaggerItem>
           <div className="lp-eyebrow">
             <span>Ministry of Railways</span>
           </div>
+          </StaggerItem>
 
+          <StaggerItem>
           <h1>One closure.<br /><em>Not three.</em></h1>
+          </StaggerItem>
 
+          <StaggerItem>
           <p className="lp-lede">
             Track, signalling and overhead-line teams each book the same
             stretch of railway separately, so it closes three times when once
             would do — and nobody checks the timetable before choosing when.
             RailVia plans all three together.
           </p>
+          </StaggerItem>
 
+          <StaggerItem>
           <div className="lp-cta">
-            <Link className="lp-btn" href="/calendar">Open the planner</Link>
-            <Link className="lp-btn ghost" href="/map">See the network</Link>
+            <Lift><Link className="lp-btn" href="/calendar">Open the planner</Link></Lift>
+            <Lift><Link className="lp-btn ghost" href="/map">See the network</Link></Lift>
           </div>
+          </StaggerItem>
 
           {/* ── the signature: the merge, on real data ── */}
+          <StaggerItem>
           <div className="lp-demo lp-anim">
             <div className="lp-demo-head">
               <b>Faridabad Nw Tn – Ballabgarh</b>
@@ -149,10 +170,13 @@ export default function Landing() {
               </figcaption>
             </figure>
           </div>
+          </StaggerItem>
+          </Stagger>
         </section>
 
         {/* ── the problem ── */}
         <section className="lp-section">
+          <Reveal>
           <h2>Three departments, three systems, one piece of track</h2>
           <p>
             Each maintains something different on the same rails, each keeps
@@ -160,6 +184,7 @@ export default function Landing() {
             to be closed. There is no shared queue, so the overlap is invisible
             to all of them.
           </p>
+          </Reveal>
           {/* ── what a closure actually is ──
               Side elevation of one stretch of line: rails, the overhead
               line above, a signal, and a train held at it. All three
@@ -298,6 +323,7 @@ export default function Landing() {
 
         {/* ── what it does ── */}
         <section className="lp-section">
+          <Reveal>
           <h2>It plans against the real timetable</h2>
           <p>
             Closing Sahibabad–Ghaziabad at 08:00 stops twenty-one trains.
@@ -309,58 +335,34 @@ export default function Landing() {
             It then solves the whole month at once, against what a division
             actually has: crews, mandated intervals, and one track.
           </p>
+          </Reveal>
+
+          {/* The three numbers are the argument, so they land rather than
+              simply being present. Each waits for the one before it. */}
           <div className="lp-figures">
-            <div className="lp-fig">
-              <b>39</b>
+            <Reveal className="lp-fig">
+              <b><CountUp to={39} /></b>
               <span>sections across four Delhi-division corridors</span>
-            </div>
-            <div className="lp-fig">
-              <b>7,267</b>
+            </Reveal>
+            <Reveal className="lp-fig" delay={0.12}>
+              <b><CountUp to={7267} /></b>
               <span>real train movements counted from the timetable</span>
-            </div>
-            <div className="lp-fig win">
-              <b>~35%</b>
+            </Reveal>
+            <Reveal className="lp-fig win" delay={0.24}>
+              <b><CountUp to={35} prefix="~" suffix="%" /></b>
               <span>fewer train-hours lost, for identical work</span>
-            </div>
+            </Reveal>
           </div>
-          <div className="lp-caveat">
+          <Reveal className="lp-caveat" delay={0.36}>
             <b>Measured, with the range stated.</b> 28.5% to 41.6% over four
             runs at a 60-second budget, against a simulation of today's
             process doing the same set of jobs.
-          </div>
-        </section>
-
-        {/* ── provenance ── */}
-        <section className="lp-section">
-          <h2>What is real, and what is not</h2>
-          <p>
-            Train timetables are public. Maintenance backlogs live in internal
-            Railways systems with no public equivalent. Every plan records
-            which of its parts came from where, and says so on screen.
-          </p>
-          <div className="lp-prov">
-            <div>
-              <span className="badge real">Real</span>
-              <h3>Sections and traffic</h3>
-              <p>
-                Station positions, section lengths and hour-by-hour train
-                counts, taken from the published Indian Railways timetable.
-              </p>
-            </div>
-            <div>
-              <span className="badge sim">Simulated</span>
-              <h3>Maintenance jobs and crews</h3>
-              <p>
-                Generated against published maintenance intervals, because
-                TMS, SMMS and TDMS are internal systems. The adapter layer
-                shows exactly where real feeds would connect.
-              </p>
-            </div>
-          </div>
+          </Reveal>
         </section>
 
         {/* ── close ── */}
         <section className="lp-section lp-close">
+          <Reveal>
           <h2>Look at next month's closures</h2>
           <p>
             The planner opens on the current month: what is proposed, what it
@@ -368,9 +370,10 @@ export default function Landing() {
             approves; a section engineer reports work done.
           </p>
           <div className="lp-cta">
-            <Link className="lp-btn" href="/calendar">Open the planner</Link>
-            <Link className="lp-btn ghost" href="/map">See the network</Link>
+            <Lift><Link className="lp-btn" href="/calendar">Open the planner</Link></Lift>
+            <Lift><Link className="lp-btn ghost" href="/map">See the network</Link></Lift>
           </div>
+          </Reveal>
         </section>
 
         <footer className="lp-foot">
@@ -379,5 +382,6 @@ export default function Landing() {
         </footer>
       </div>
     </div>
+    </MotionRoot>
   );
 }
