@@ -94,8 +94,7 @@ export function Sidebar() {
       {!collapsed ? (
         <div className="division-picker">
           <div className="division-picker-label">
-            <span className="dot-indicator" />
-            <span>Division</span>
+            <span>Select Division</span>
           </div>
           <div className="division-select-wrap">
             <select

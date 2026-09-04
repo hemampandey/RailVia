@@ -38,7 +38,7 @@ export default function Landing() {
         {/* ── hero ── */}
         <section className="lp-hero">
           <div className="lp-eyebrow">
-            <span>SIH26027</span><span>Ministry of Railways</span><span>Delhi division</span>
+            <span>Ministry of Railways</span>
           </div>
 
           <h1>One closure.<br /><em>Not three.</em></h1>
