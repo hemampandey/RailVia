@@ -123,9 +123,20 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 export interface Station { name: string; lat: number | null; lng: number | null; }
 
+/** One section, as /api/network sends it.
+ *
+ * Geometry only. The endpoint deliberately trims the full section record —
+ * no train lists, no hourly profile — so these are the only fields that
+ * exist here, whatever `_network()` holds internally. */
 export interface NetworkSection {
-  id: string; a: string; b: string; name: string;
-  length_km: number | null; daily_trains: number; peak: number;
+  id: string;
+  a: string;
+  b: string;
+  name: string;
+  length_km: number | null;
+  daily_trains: number;
+  /** Busiest hour, trains/hour. */
+  peak: number;
 }
 
 export interface Network {

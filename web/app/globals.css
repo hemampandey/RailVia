@@ -1227,8 +1227,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* ── network map ───────────────────────────────────────────────────── */
-.map{display:block;width:100%;max-width:100%;height:auto;min-width:620px}
-.map-label{font-family:var(--font-mono);font-size:9.5px;fill:var(--text-faint)}
 
 /* ── sign in ───────────────────────────────────────────────────────
    The sign-in page lost its styling when the stylesheet was rewritten:
@@ -2146,4 +2144,151 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
   .n-table thead { display: table-header-group; }
   .n-head, .n-foot { break-inside: avoid; }
   .n-foot { break-before: avoid; }
+}
+
+/* ── the division map ───────────────────────────────────────────────────
+ *
+ * Map beside detail, not above it: selecting a section used to push its
+ * trains below the fold, so the click and its answer were never on screen
+ * together.
+ */
+
+.mapgrid {
+  display: grid;
+  /* The map column is sized by the map, not by a chosen fraction. This
+     division runs almost due north-south, so the drawing is roughly 2.4:1
+     tall — a fractional split left it as a narrow ribbon adrift in a wide
+     panel. The detail takes what is left, which is what needs the width:
+     a list of closures and the services each one holds. */
+  grid-template-columns: auto minmax(360px, 1fr);
+  gap: var(--s4);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .mapgrid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.map-wrap { padding: var(--s3) var(--s4) var(--s4); overflow-x: auto; }
+/* Centred. The component states both dimensions from the projected extent,
+   so this only has to place it — a north-south division is a tall drawing,
+   and forcing it to panel proportions would be a lie about where the track
+   goes. */
+.map { display: block; margin: 0 auto; max-width: 100%; }
+.map-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  fill: var(--text-faint);
+}
+.map-sec line:first-child { transition: stroke-width 0.12s ease; }
+.map-sec:hover line:first-child { stroke-width: 8; }
+
+.map-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border-soft);
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.map-key span { display: inline-flex; align-items: center; gap: 5px; }
+.map-key i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.map-key .k-closed { background: var(--bad); }
+.map-key .k-open { background: var(--text-faint); opacity: 0.45; }
+.map-key .k-weight { color: var(--text-faint); opacity: 0.75; }
+
+/* ── the section panel ──────────────────────────────────────────────── */
+
+.mapside { position: sticky; top: var(--s4); }
+.ms-body { padding: var(--s4); }
+
+.map-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s5) var(--s4);
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.map-empty b { color: var(--text); font-family: var(--font-display); font-size: 15px; }
+.map-empty.good { background: var(--good-soft); border-radius: var(--radius); text-align: left; }
+.map-empty.good b { color: var(--good); }
+
+.ms-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s3);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--border-soft);
+}
+.ms-stats > div { display: flex; flex-direction: column; }
+.ms-stats span {
+  font-family: var(--font-label);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.ms-stats b {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-h {
+  margin: var(--s4) 0 var(--s2);
+  font-family: var(--font-label);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+/* Every closure on the section, not the first with an apology. */
+.ms-picks { display: grid; gap: var(--s1); }
+.ms-pick {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--s3);
+  align-items: baseline;
+  text-align: left;
+  padding: 7px var(--s3);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.ms-pick.on { border-color: var(--primary); background: var(--primary-soft); }
+.ms-pick b { font-weight: 700; }
+.ms-pick span { color: var(--text-muted); font-size: 11.5px; }
+.ms-pick em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.ms-jobs { margin-top: var(--s3); }
+
+.ms-trains { margin-top: var(--s2); max-height: 340px; overflow-y: auto; }
+.ms-trains table { min-width: 0; }
+.ms-trains th, .ms-trains td { padding: 6px var(--s2) 6px 0; font-size: 12.5px; }
+.ms-trains td small {
+  display: block;
+  font-size: 10.5px;
+  color: var(--text-faint);
 }
