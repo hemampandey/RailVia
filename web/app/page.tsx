@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   CountUp, Lift, MotionRoot, RailProgress, Reveal, Stagger, StaggerItem,
 } from "@/components/landing-motion";
-import { BrandMark } from "@/components/BrandMark";
 
 /* The landing page. Public — a judge should be able to understand what this
    is without an account.
@@ -79,8 +78,20 @@ export default function Landing() {
         <RailProgress />
         <header className="lp-top">
           <div className="lp-brand">
-            <BrandMark />
-            RailVia
+            <span className="lp-mark lp-mark-img">
+              <img src="/images/logo.png" alt="RailVia Logo" width={50} height={50} />
+            </span>
+            <span>RailVia</span>
+          </div>
+          <div className="lp-top-right">
+            <img
+              src="/images/indian_railways.png"
+              alt="Indian Railways"
+              title="Indian Railways / भारतीय रेल"
+              className="lp-ir-logo"
+              width={80}
+              height={80}
+            />
           </div>
         </header>
 
