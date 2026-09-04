@@ -1831,7 +1831,7 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
   letter-spacing: -0.025em;
   margin: 2px 0 0;
 }
-.n-ref { text-align: right; flex: none; }
+.n-ref { text-align: right; flex: 0 1 auto; min-width: 0; }
 .n-ref span {
   display: block;
   font-family: var(--font-label);
@@ -1949,130 +1949,72 @@ button.primary:hover:not(:disabled) { background: var(--primary-hover); }
 /* Printing: the sheet alone, on paper, with nothing of the application
    around it. `visibility` rather than `display` so the notice keeps its place
    in the flow and does not have to be repositioned. */
-@media print {
-  body { background: #fff; }
-  body * { visibility: hidden; }
-  .notice, .notice * { visibility: visible; }
-  .notice-backdrop {
-    position: static; background: none; padding: 0;
-    overflow: visible; display: block;
-  }
-  .notice-sheet { width: 100%; }
-  .notice-actions { display: none; }
-  .notice { padding: 0; border-radius: 0; }
-  .n-block { break-inside: avoid; }
-  .n-table tr { break-inside: avoid; }
-}
-
-/* ── tonight ────────────────────────────────────────────────────────────
+/* Printing the notice.
  *
- * A shift board. Read standing up, in a hurry: time first and large, the
- * ungranted ones first and marked, everything else quiet.
+ * The sheet is portalled to the end of <body>, so the application is exactly
+ * "every child of body that is not this overlay" — and it is removed, not
+ * hidden. `visibility: hidden` was the bug: it keeps layout, so a 100vh
+ * sidebar and a page of ninety closures still occupied space and pushed the
+ * notice past them, printing blank sheets before it.
  */
-
-.tn-when {
-  font-family: var(--font-label);
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--text-faint);
+@page {
+  margin: 14mm;
 }
 
-.tn-alert {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: var(--s3) var(--s4);
-  margin-bottom: var(--s4);
-  background: var(--bad-soft);
-  border-left: 3px solid var(--bad);
-  border-radius: 0 var(--radius) var(--radius) 0;
-}
-.tn-alert b { font-size: 14px; color: var(--bad); }
-.tn-alert span { font-size: 12.5px; color: var(--text-muted); }
+@media print {
+  html, body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
 
-.tn-list { display: grid; gap: var(--s2); }
+  /* The application, gone. Every overlay portals to body, so an explanation
+     panel left open behind the notice is removed by the same rule. */
+  body > *:not(.notice-backdrop) { display: none !important; }
 
-.tn-item {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) auto;
-  gap: var(--s4);
-  align-items: start;
-  padding: var(--s4);
-  background: var(--surface);
-  border: 1px solid var(--border-soft);
-  border-left: 3px solid var(--border);
-  border-radius: var(--radius);
-}
-.tn-item.ungranted { border-left-color: var(--bad); }
-.tn-item.live { border-left-color: var(--good); }
+  .notice-backdrop {
+    position: static !important;
+    display: block !important;
+    inset: auto !important;
+    background: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    z-index: auto !important;
+  }
 
-.tn-time { display: flex; flex-direction: column; }
-.tn-time b {
-  font-family: var(--font-mono);
-  font-size: 21px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-}
-.tn-time span { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint); }
-.tn-time em {
-  font-style: normal;
-  font-family: var(--font-label);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-top: 3px;
-}
+  .notice-sheet { width: 100% !important; max-width: none !important; }
+  .notice-actions { display: none !important; }
 
-.tn-body { min-width: 0; }
-.tn-where { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; font-weight: 600; margin-bottom: var(--s2); }
-.tn-where code { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint); }
+  .notice {
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #14202b !important;
+    font-size: 11pt;
+    line-height: 1.45;
+    /* Without this the department colour codes, the amber "not yet granted"
+       panel and the ruled headings drop out — browsers strip backgrounds and
+       adjust colour for print unless told the colour carries meaning. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 
-.tn-flag {
-  font-family: var(--font-label);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  background: var(--bad-soft);
-  color: var(--bad);
-}
-.tn-flag.live { background: var(--good-soft); color: var(--good); }
+  /* Tuned for paper rather than a screen: the reference and the block times
+     stay legible, everything else comes down a step. */
+  .n-head h2 { font-size: 19pt; }
+  /* The reference is read once, off the page, to quote in a message. It does
+     not need to compete with the title for width. */
+  .n-ref b { font-size: 8.5pt; }
+  .n-grid dd.big { font-size: 18pt; }
+  .n-grid { margin: 16px 0; }
+  .n-block { margin-top: 18px; }
 
-.tn-cost { text-align: right; flex: none; }
-.tn-cost b {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 17px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.tn-cost span { font-size: 10.5px; color: var(--text-faint); }
-
-/* The row's own controls come from BlockRow, so approving and issuing the
-   notice work here exactly as they do on the plan. Its card chrome is
-   stripped, because this card already provides it. */
-.tn-act { grid-column: 1 / -1; }
-.tn-act .block {
-  border: none;
-  border-top: 1px solid var(--border-soft);
-  border-radius: 0;
-  background: none;
-  padding: var(--s3) 0 0;
-  margin: 0;
-}
-.tn-act .block:hover { background: none; }
-.tn-act .when, .tn-act .where, .tn-act .jobs, .tn-act .cost { display: none; }
-.tn-act .acts { margin-left: 0; }
-
-@media (max-width: 720px) {
-  .tn-item { grid-template-columns: 1fr; gap: var(--s3); }
-  .tn-cost { text-align: left; }
+  /* A possession notice is read in one piece. Keep each section, and each
+     row of the work and traffic tables, off a page boundary. */
+  .n-block { break-inside: avoid; }
+  .n-table { break-inside: auto; }
+  .n-table tr { break-inside: avoid; }
+  .n-table thead { display: table-header-group; }
+  .n-head, .n-foot { break-inside: avoid; }
+  .n-foot { break-before: avoid; }
 }
