@@ -233,7 +233,7 @@
   max-width: 105ch;
 }
 .lp-demo figcaption b { color: var(--lp-ink); font-weight: 600; }
-
+ 
 /* ── generic section type ────────────────────────────────────────── */
 .lp-section h2 {
   font: 700 clamp(28px, 3.8vw, 44px)/1.12 var(--lp-display);
