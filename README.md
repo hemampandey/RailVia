@@ -1,14 +1,3 @@
----
-title: RailVia
-emoji: 🚂
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
-short_description: Coordinated maintenance block planning for Indian Railways
----
-
 <div align="center">
 
 # 🚂 RailVia — Automatic Block Planning
